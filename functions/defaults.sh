@@ -413,7 +413,7 @@ Set_defaults ()
 		armel)
 			# armel will have special images: one rootfs image and many additional kernel images.
 			# therefore we default to all available armel flavours
-			LB_LINUX_FLAVOURS="${LB_LINUX_FLAVOURS:-kirkwood orion5x}"
+			LB_LINUX_FLAVOURS="${LB_LINUX_FLAVOURS:-marvell}"
 			;;
 
 		armhf)
@@ -651,7 +651,7 @@ Set_defaults ()
 	esac
 
 	# Set iso preparer
-	LB_ISO_PREPARER="${LB_ISO_PREPARER:-live-build \$VERSION; https://debian-live.alioth.debian.org/devel/live-build}"
+	LB_ISO_PREPARER="${LB_ISO_PREPARER:-live-build \$VERSION; https://debian-live.alioth.debian.org/live-build}"
 
 	# Set iso publisher
 	case "${LB_MODE}" in
