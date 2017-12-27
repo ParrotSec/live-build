@@ -44,7 +44,7 @@ case "${1}" in
 		mkdir -p chroot/sys
 
 		# Mounting /sys
-		mount sysfs-live -t sysfs chroot/sys
+		mount sysfs-live -t sysfs chroot/sys || true
 
 		# Creating stage file
 		Create_stagefile .build/chroot_sysfs
@@ -62,7 +62,9 @@ case "${1}" in
 		# Unmounting /sys
 		if [ -e chroot/sys/class ]
 		then
-			umount chroot/sys
+			umount chroot/proc/sys/fs/binfmt_misc || true
+			umount chroot/proc || true
+			umount chroot/sys || true
 		fi
 
 		# Removing stage file

@@ -55,13 +55,13 @@ case "${1}" in
 		then
 			# Move resolv.conf aside if it's a symlink (likely resolvconf)
 			mv chroot/etc/resolv.conf chroot/etc/resolv.conf.orig
-			# Create resolv file
+			# Copy resolv file
 			cat /etc/resolv.conf > chroot/etc/resolv.conf
 		fi
 
 		if [ -f /etc/resolv.conf ]
 		then
-			# Create resolv file
+			# Copy resolv file
 			cat /etc/resolv.conf > chroot/etc/resolv.conf
 		fi
 
