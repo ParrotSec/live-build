@@ -63,7 +63,6 @@ case "${1}" in
 		if [ -e chroot/sys/class ]
 		then
 			umount chroot/proc/sys/fs/binfmt_misc || true
-			umount chroot/proc || true
 			umount chroot/sys || true
 		fi
 
