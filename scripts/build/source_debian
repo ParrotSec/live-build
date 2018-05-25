@@ -117,19 +117,19 @@ fi
 # where available. workaround: disable backports
 case "${LB_MODE}" in
 	progress-linux)
-		case "${LB_DISTRIBUTION}" in
+		case "${LB_DISTRIBUTION_BINARY}" in
 			*-backports)
 
 				;;
 
 			*)
-				if grep -qs "${LB_DISTRIBUTION}-backports" chroot/etc/apt/sources.list.d/progress-linux.list
+				if grep -qs "${LB_DISTRIBUTION_BINARY}-backports" chroot/etc/apt/sources.list.d/progress-linux.list
 				then
 					cp chroot/etc/apt/sources.list.d/progress-linux.list chroot/etc/apt/sources.list.d/progress-linux.list.orig
 
 					while read _LINE
 					do
-						if echo "${_LINE}" | grep -qs ${LB_DISTRIBUTION}-backports
+						if echo "${_LINE}" | grep -qs ${LB_DISTRIBUTION_BINARY}-backports
 						then
 							sed -i -e "s|${_LINE}|#${_LINE}|" chroot/etc/apt/sources.list.d/progress-linux.list
 						fi

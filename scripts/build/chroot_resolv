@@ -55,14 +55,12 @@ case "${1}" in
 		then
 			# Move resolv.conf aside if it's a symlink (likely resolvconf)
 			mv chroot/etc/resolv.conf chroot/etc/resolv.conf.orig
-			# Copy resolv file
-			cat /etc/resolv.conf > chroot/etc/resolv.conf
 		fi
 
 		if [ -f /etc/resolv.conf ]
 		then
 			# Copy resolv file
-			cat /etc/resolv.conf > chroot/etc/resolv.conf
+			cp /etc/resolv.conf chroot/etc/resolv.conf
 		fi
 
 		# Creating stage file
@@ -96,7 +94,7 @@ case "${1}" in
 		if [ -e chroot/etc/resolvconf/resolv.conf.d ]
 		then
 			rm -f chroot/etc/resolvconf/resolv.conf.d/original
-			#rm -f chroot/etc/resolvconf/resolv.conf.d/tail
+			rm -f chroot/etc/resolvconf/resolv.conf.d/tail
 		fi
 
 		# Removing stage file

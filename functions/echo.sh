@@ -193,7 +193,7 @@ Echo_file ()
 
 Echo_breakage ()
 {
-	case "${LB_PARENT_DISTRIBUTION}" in
+	case "${LB_PARENT_DISTRIBUTION_BINARY}" in
 		sid)
 			Echo_message "If the following stage fails, the most likely cause of the problem is with your mirror configuration, a caching proxy or the sid distribution."
 			;;

@@ -49,8 +49,8 @@ Create_lockfile .lock
 
 mkdir -p source/.disk
 
-DISTRIBUTION="$(echo ${LB_DISTRIBUTION} | cut -b 1 | tr '[a-z]' '[A-Z]')"
-DISTRIBUTION="${DISTRIBUTION}$(echo ${LB_DISTRIBUTION} | cut -b 2-)"
+DISTRIBUTION="$(echo ${LB_DISTRIBUTION_BINARY} | cut -b 1 | tr '[a-z]' '[A-Z]')"
+DISTRIBUTION="${DISTRIBUTION}$(echo ${LB_DISTRIBUTION_BINARY} | cut -b 2-)"
 
 if [ -e chroot/etc/os-release ]
 then

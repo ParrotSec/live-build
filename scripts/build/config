@@ -57,6 +57,10 @@ USAGE="${PROGRAM}   [--apt apt|aptitude]\n\
 \t    [-d|--distribution CODENAME]\n\
 \t    [--parent-distribution CODENAME]\n\
 \t    [--parent-debian-installer-distribution CODENAME]\n\
+\t    [--distribution-chroot CODENAME]\n\
+\t    [--parent-distribution-chroot CODENAME]\n\
+\t    [--distribution-binary CODENAME]\n\
+\t    [--parent-distribution-binary CODENAME]\n\
 \t    [--dump]\n\
 \t    [--fdisk fdisk|fdisk.dist]\n\
 \t    [--force]\n\
@@ -105,6 +109,8 @@ USAGE="${PROGRAM}   [--apt apt|aptitude]\n\
 \t    [--net-cow-path PATH]\n\
 \t    [--net-cow-server IP|HOSTNAME]\n\
 \t    [--net-tarball true|false]\n\
+\t    [--onie true|false]\n\
+\t    [--onie-kernel-cmdline \"OPTION1 OPTION2\"]\n\
 \t    [--quiet]\n\
 \t    [--archive-areas ARCHIVE_AREA|\"ARCHIVE_AREAS\"]\n\
 \t    [--parent-archive-areas ARCHIVE_AREA|\"ARCHIVE_AREAS\"]\n\
@@ -116,6 +122,7 @@ USAGE="${PROGRAM}   [--apt apt|aptitude]\n\
 \t    [--swap-file-path PATH]\n\
 \t    [--swap-file-size MB]\n\
 \t    [--tasksel apt|aptitude|tasksel]\n\
+\t    [--uefi-secure-boot auto|enable|disable]\n\
 \t    [--updates true|false]\n\
 \t    [--backports true|false]\n\
 \t    [--verbose]\n\
@@ -133,7 +140,10 @@ Local_arguments ()
 		cache-stages:,debconf-frontend:,debconf-priority:,dump,
 		initramfs:,initramfs-compression:,initsystem:,fdisk:,losetup:,mode:,system:,tasksel:,
 		architectures:,clean,
-		distribution:,parent-distribution:,parent-debian-installer-distribution:,parent-mirror-bootstrap:,parent-mirror-chroot:,parent-mirror-chroot-security:,parent-mirror-binary:,
+		distribution:,parent-distribution:,parent-debian-installer-distribution:,
+		distribution-chroot:,parent-distribution-chroot:,
+		distribution-binary:,parent-distribution-binary:,
+		parent-mirror-bootstrap:,parent-mirror-chroot:,parent-mirror-chroot-security:,parent-mirror-binary:,
 		parent-mirror-binary-security:,parent-mirror-debian-installer:,
 		mirror-bootstrap:,mirror-chroot:,mirror-chroot-security:,mirror-binary:,
 		mirror-binary-security:,mirror-debian-installer:,
@@ -145,9 +155,10 @@ Local_arguments ()
 		grub-splash:,isohybrid-options:,hdd-label:,hdd-size:,hdd-partition-start:,iso-application:,iso-preparer:,iso-publisher:,
 		iso-volume:,jffs2-eraseblock:,memtest:,net-root-filesystem:,net-root-mountoptions:,
 		net-root-path:,net-root-server:,net-cow-filesystem:,net-cow-mountoptions:,net-cow-path:,
-		net-cow-server:,net-tarball:,firmware-binary:,firmware-chroot:,swap-file-path:,swap-file-size:,
+		net-cow-server:,net-tarball:,onie:,onie-kernel-cmdline:,firmware-binary:,firmware-chroot:,swap-file-path:,swap-file-size:,
 		loadlin:,win32-loader:,source:,source-images:,breakpoints,conffile:,debug,force,
 		help,ignore-system-defaults,quiet,usage,verbose,version,bootstrap-qemu-static:,bootstrap-qemu-arch:,
+		uefi-secure-boot:,
 		bootstrap-qemu-exclude:"
 	# Remove spaces added by indentation
 	LONG_OPTIONS="$(echo ${LONG_OPTIONS} | tr -d ' ')"
@@ -349,6 +360,26 @@ Local_arguments ()
 
 			--parent-distribution)
 				LB_PARENT_DISTRIBUTION="${2}"
+				shift 2
+				;;
+
+			--distribution-chroot)
+				LB_DISTRIBUTION_CHROOT="${2}"
+				shift 2
+				;;
+
+			--parent-distribution-chroot)
+				LB_PARENT_DISTRIBUTION_CHROOT="${2}"
+				shift 2
+				;;
+
+			--distribution-binary)
+				LB_DISTRIBUTION_BINARY="${2}"
+				shift 2
+				;;
+
+			--parent-distribution-binary)
+				LB_PARENT_DISTRIBUTION_BINARY="${2}"
 				shift 2
 				;;
 
@@ -654,6 +685,16 @@ Local_arguments ()
 				shift 2
 				;;
 
+			--onie)
+				LB_ONIE="${2}"
+				shift 2
+				;;
+
+			--onie-kernel-cmdline)
+				LB_ONIE_KERNEL_CMDLINE="${2}"
+				shift 2
+				;;
+
 			--firmware-binary)
 				LB_FIRMWARE_BINARY="${2}"
 				shift 2
@@ -671,6 +712,11 @@ Local_arguments ()
 
 			--swap-file-size)
 				LB_SWAP_FILE_SIZE="${2}"
+				shift 2
+				;;
+
+			--uefi-secure-boot)
+				LB_UEFI_SECURE_BOOT="${2}"
 				shift 2
 				;;
 
@@ -879,10 +925,10 @@ Check_defaults
 
 if [ ! -e config ]
 then
-	Echo_message "Creating config tree for a ${LB_MODE}/${LB_DISTRIBUTION}/${LB_ARCHITECTURES} system"
+	Echo_message "Creating config tree for a ${LB_MODE}/${LB_DISTRIBUTION_BINARY}/${LB_ARCHITECTURES} system"
 	mkdir config
 else
-	Echo_message "Updating config tree for a ${LB_MODE}/${LB_DISTRIBUTION}/${LB_ARCHITECTURES} system"
+	Echo_message "Updating config tree for a ${LB_MODE}/${LB_DISTRIBUTION_BINARY}/${LB_ARCHITECTURES} system"
 fi
 
 # Creating live-build configuration
@@ -1019,6 +1065,22 @@ LB_DISTRIBUTION="${LB_DISTRIBUTION}"
 # \$LB_PARENT_DISTRIBUTION: select parent distribution to use
 # (Default: ${LB_PARENT_DISTRIBUTION})
 LB_PARENT_DISTRIBUTION="${LB_PARENT_DISTRIBUTION}"
+
+# \$LB_DISTRIBUTION_CHROOT: select distribution to use in the chroot
+# (Default: ${LB_DISTRIBUTION_CHROOT})
+LB_DISTRIBUTION_CHROOT="${LB_DISTRIBUTION_CHROOT}"
+
+# \$LB_PARENT_DISTRIBUTION_CHROOT: select parent distribution to use in the chroot
+# (Default: ${LB_PARENT_DISTRIBUTION_CHROOT})
+LB_PARENT_DISTRIBUTION_CHROOT="${LB_PARENT_DISTRIBUTION_CHROOT}"
+
+# \$LB_DISTRIBUTION_BINARY: select distribution to use in the final image
+# (Default: ${LB_DISTRIBUTION_BINARY})
+LB_DISTRIBUTION_BINARY="${LB_DISTRIBUTION_BINARY}"
+
+# \$LB_PARENT_DISTRIBUTION_BINARY: select parent distribution to use in the final image
+# (Default: ${LB_PARENT_DISTRIBUTION_BINARY})
+LB_PARENT_DISTRIBUTION_BINARY="${LB_PARENT_DISTRIBUTION_BINARY}"
 
 # \$LB_PARENT_DEBIAN_INSTALLER_DISTRIBUTION: select parent distribution for debian-installer to use
 # (Default: ${LB_PARENT_DEBIAN_INSTALLER_DISTRIBUTION})
@@ -1284,6 +1346,14 @@ LB_NET_COW_SERVER="${LB_NET_COW_SERVER}"
 # (Default: ${LB_NET_TARBALL})
 LB_NET_TARBALL="${LB_NET_TARBALL}"
 
+# \$LB_ONIE: set onie
+# (Default: ${LB_ONIE})
+LB_ONIE="${LB_ONIE}"
+
+# \$LB_ONIE_KERNEL_CMDLINE: set onie additional kernel cmdline options
+# (Default: ${LB_ONIE_KERNEL_CMDLINE})
+LB_ONIE_KERNEL_CMDLINE="${LB_ONIE_KERNEL_CMDLINE}"
+
 # \$LB_FIRMWARE_BINARY: include firmware packages in debian-installer
 # (Default: ${LB_FIRMWARE_BINARY})
 LB_FIRMWARE_BINARY="${LB_FIRMWARE_BINARY}"
@@ -1299,6 +1369,10 @@ LB_SWAP_FILE_PATH="${LB_SWAP_FILE_PATH}"
 # \$LB_SWAP_FILE_SIZE: set swap file size
 # (Default: ${LB_SWAP_FILE_SIZE})
 LB_SWAP_FILE_SIZE="${LB_SWAP_FILE_SIZE}"
+
+# \$LB_UEFI_SECURE_BOOT: enable/disable UEFI secure boot
+# (Default: ${LB_UEFI_SECURE_BOOT})
+LB_UEFI_SECURE_BOOT="${LB_UEFI_SECURE_BOOT}"
 EOF
 
 # Creating lb_source_* configuration
@@ -1386,7 +1460,8 @@ cat > config/build << EOF
 [Image]
 Architecture: ${LB_ARCHITECTURES}
 Archive-Areas: ${LB_ARCHIVE_AREAS}
-Distribution: ${LB_DISTRIBUTION}
+Distribution-Chroot: ${LB_DISTRIBUTION_CHROOT}
+Distribution-Binary: ${LB_DISTRIBUTION_BINARY}
 Mirror-Bootstrap: ${LB_MIRROR_BOOTSTRAP}
 EOF
 
@@ -1396,7 +1471,8 @@ then
 cat >> config/build << EOF
 
 Parent-Archive-Areas: ${LB_ARCHIVE_AREAS}
-Parent-Distribution: ${LB_PARENT_DISTRIBUTION}
+Parent-Distribution-Chroot: ${LB_PARENT_DISTRIBUTION_CHROOT}
+Parent-Distribution-Binary: ${LB_PARENT_DISTRIBUTION_BINARY}
 Parent-Mirror-Bootstrap: ${LB_PARENT_MIRROR_BOOTSTRAP}
 EOF
 
