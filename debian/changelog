@@ -1,3 +1,38 @@
+live-build (1:20180618parrot1) testing; urgency=medium
+
+  * Rebuild for Parrot.
+  * don't let chroot_resolv remove tail.
+
+ -- Lorenzo "Palinuro" Faletra <palinuro@parrotsec.org>  Sat, 11 Aug 2018 01:19:40 +0200
+
+live-build (1:20180618kali1) kali-dev; urgency=medium
+
+  * Synchronize with Debian. Remaining changes:
+    - XORRISO options for EFI boot
+    - Implement use of different distributions for build and runtime
+    usage.
+
+ -- Sophie Brun <sophie@freexian.com>  Tue, 26 Jun 2018 12:12:12 +0200
+
+live-build (1:20180618) unstable; urgency=medium
+
+  * ONIE: make lb clean remove the ONIE binary.
+  * Avoid apt-key add and just drop the custom user-supplied apt key in
+    /etc/apt/trusted.gpg.d. Note that this requires the key to be in
+    armored ASCII format - which is usually the default anyway.
+  * UEFI: parse vendor from Grub package metadata if available, and use
+    it in the EFI partition directory layout instead of always using
+    "debian" (which is still the default fallback).
+  * Bump Standards-Version to 4.1.4, no changes.
+
+ -- Luca Boccassi <bluca@debian.org>  Mon, 18 Jun 2018 12:02:55 +0100
+
+live-build (1:20180411parrot2) testing; urgency=medium
+
+  * Fix the dns shit.
+
+ -- Lorenzo "Palinuro" Faletra <palinuro@parrotsec.org>  Tue, 12 Jun 2018 02:20:59 +0200
+
 live-build (1:20180411parrot1) testing; urgency=medium
 
   * Import new Debian release.
@@ -198,7 +233,7 @@ live-build (1:20161202) unstable; urgency=medium
   * Drop left-over translation files for removed lb_testroot command.
   * Get rid of useless bootstrap_archive-keys script. Closes: #773775
   * Drop an optimization in chroot_archives that has undesired side-effects.
-    Thanks to jnqnfe for the patch. Closes: #775989 
+    Thanks to jnqnfe for the patch. Closes: #775989
   * Drop gpgv and debian-keyring from Suggests.
   * Fix Check_installed function when checking against host. Thanks to jnqnfe
     for the report. Closes: #774807
