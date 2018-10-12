@@ -5,10 +5,11 @@ Maintainer: Debian Live <debian-live@lists.debian.org>
 Uploaders: Raphaël Hertzog <hertzog@debian.org>,
  Luca Boccassi <bluca@debian.org>,
 Build-Depends:
- debhelper (>= 10),
+ debhelper (>= 10~),
  po4a,
  gettext,
-Standards-Version: 4.1.4
+Standards-Version: 4.2.1
+Rules-Requires-Root: no
 Homepage: https://debian-live.alioth.debian.org/live-build/
 Vcs-Browser: https://salsa.debian.org/live-team/live-build
 Vcs-Git: https://salsa.debian.org/live-team/live-build.git
