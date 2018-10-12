@@ -1,4 +1,4 @@
-live-build (1:20180925parrot1) testing; urgency=medium
+live-build (1:20180925+parrot1) testing; urgency=medium
 
   * Import new Debian release.
 
