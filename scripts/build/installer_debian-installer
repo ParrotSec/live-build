@@ -311,9 +311,6 @@ then
 	# Downloading additional packages
 	mkdir -p chroot/binary.deb/archives/partial
 
-	mv chroot/var/lib/dpkg/status chroot/var/lib/dpkg/status.tmp
-	touch chroot/var/lib/dpkg/status
-
 	case "${LB_ARCHITECTURES}" in
 		amd64)
 			DI_REQ_PACKAGES="lilo grub-pc"
@@ -401,7 +398,7 @@ then
 	fi
 
 	# Set apt command prefix
-	_LB_APT_COMMAND="apt-get ${APT_OPTIONS} -o Dir::Cache=/binary.deb -o APT::Install-Recommends=false --download-only"
+	_LB_APT_COMMAND="apt-get ${APT_OPTIONS} -o Dir::Cache=/binary.deb -o Dir::State::status=/dev/null -o APT::Install-Recommends=false --download-only"
 
 	if [ "${LB_DEBIAN_INSTALLER}" = "live" ]
 	then
@@ -417,7 +414,7 @@ then
 
 		# Drop the packages already installed that d-i doesn't explicitely need
 		_REMAINING_PACKAGES="$(echo ${DI_FIRMWARE_PACKAGES} ${DI_REQ_PACKAGES} | sed -e 's# #|#g')"
-		_REMAINING_PACKAGES="$(sed -n -e 's|Package: ||p' chroot/var/lib/dpkg/status.tmp | grep -E -v "^(${_REMAINING_PACKAGES})\$")"
+		_REMAINING_PACKAGES="$(Chroot_package_list chroot | grep -E -v "^(${_REMAINING_PACKAGES})\$")"
 
 		for _PACKAGE in ${_REMAINING_PACKAGES}
 		do
@@ -427,9 +424,6 @@ then
 		# Download .debs of the required packages
 		Chroot chroot ${_LB_APT_COMMAND} install ${DI_PACKAGES} ${DI_FIRMWARE_PACKAGES}
 	fi
-
-	# Revert dpkg status file
-	mv chroot/var/lib/dpkg/status.tmp chroot/var/lib/dpkg/status
 
 	mv chroot/binary.deb ./
 
@@ -520,7 +514,7 @@ then
 	fi
 
 	# Udeb handling
-	mkdir binary.udeb
+	mkdir -p binary.udeb/pool-udeb/main
 	cd binary.udeb
 
 	# Downloading udeb indices
@@ -576,7 +570,7 @@ then
 		do
 			if [ -e "${FILE}" ]
 			then
-				Install_file "${FILE}" "pool"
+				Install_file "${FILE}" "pool-udeb"
 
 				# Prefer local udebs over downloaded udebs
 				rm -f "$(basename ${FILE} | awk -F_ '{ print $1 }')"_*.udeb
@@ -590,7 +584,7 @@ then
 		do
 			if [ -e "${FILE}" ]
 			then
-				Install_file "${FILE}" "pool"
+				Install_file "${FILE}" "pool-udeb"
 
 				# Prefer local udebs over downloaded udebs
 				rm -f "$(basename ${FILE} | awk -F_ '{ print $1 }')"_*.udeb
@@ -635,8 +629,8 @@ then
 	do
 		if [ -f "$(basename ${UDEB})" ]
 		then
-			mkdir -p $(dirname ${UDEB})
-			mv "$(basename ${UDEB})" "$(dirname ${UDEB})"
+			Install_file "$(basename ${UDEB})" "pool-udeb"
+			rm "$(basename ${UDEB})"
 		fi
 	done
 
@@ -645,7 +639,7 @@ then
 	cd "${OLDPWD}"
 
 	mv binary.udeb chroot/root
-	echo "cd /root/binary.udeb && apt-ftparchive packages pool/main > dists/${LB_PARENT_DEBIAN_INSTALLER_DISTRIBUTION}/main/debian-installer/binary-${LB_ARCHITECTURES}/Packages" > chroot/binary.sh
+	echo "cd /root/binary.udeb && apt-ftparchive packages pool-udeb/main > dists/${LB_PARENT_DEBIAN_INSTALLER_DISTRIBUTION}/main/debian-installer/binary-${LB_ARCHITECTURES}/Packages" > chroot/binary.sh
 	Chroot chroot "sh binary.sh"
 	rm -f chroot/binary.sh
 	mv chroot/root/binary.udeb ./

@@ -124,7 +124,7 @@ Set_defaults ()
 			;;
 
 		*)
-			LB_DISTRIBUTION="${LB_DISTRIBUTION:-stretch}"
+			LB_DISTRIBUTION="${LB_DISTRIBUTION:-buster}"
 			LB_DERIVATIVE="false"
 			;;
 	esac
@@ -332,12 +332,12 @@ Set_defaults ()
 	# Setting mirror to fetch packages from
 	case "${LB_MODE}" in
 		debian)
-			LB_MIRROR_BOOTSTRAP="${LB_MIRROR_BOOTSTRAP:-http://deb.parrotsec.org/parrot/}"
+			LB_MIRROR_BOOTSTRAP="${LB_MIRROR_BOOTSTRAP:-http://deb.debian.org/debian/}"
 			LB_PARENT_MIRROR_BOOTSTRAP="${LB_PARENT_MIRROR_BOOTSTRAP:-${LB_MIRROR_BOOTSTRAP}}"
 			;;
 
 		progress-linux)
-			LB_PARENT_MIRROR_BOOTSTRAP="${LB_PARENT_MIRROR_BOOTSTRAP:-http://deb.parrotsec.org/parrot/}"
+			LB_PARENT_MIRROR_BOOTSTRAP="${LB_PARENT_MIRROR_BOOTSTRAP:-http://deb.debian.org/debian/}"
 			LB_MIRROR_BOOTSTRAP="${LB_MIRROR_BOOTSTRAP:-http://cdn.archive.progress-linux.org/packages/}"
 			;;
 	esac
@@ -348,12 +348,12 @@ Set_defaults ()
 	# Setting security mirror to fetch packages from
 	case "${LB_MODE}" in
 		debian)
-			LB_MIRROR_CHROOT_SECURITY="${LB_MIRROR_CHROOT_SECURITY:-http://security.parrotsec.org/}"
+			LB_MIRROR_CHROOT_SECURITY="${LB_MIRROR_CHROOT_SECURITY:-http://security.debian.org/}"
 			LB_PARENT_MIRROR_CHROOT_SECURITY="${LB_PARENT_MIRROR_CHROOT_SECURITY:-${LB_MIRROR_CHROOT_SECURITY}}"
 			;;
 
 		progress-linux)
-			LB_PARENT_MIRROR_CHROOT_SECURITY="${LB_PARENT_MIRROR_CHROOT_SECURITY:-http://security.parrotsec.org/}"
+			LB_PARENT_MIRROR_CHROOT_SECURITY="${LB_PARENT_MIRROR_CHROOT_SECURITY:-http://security.debian.org/}"
 			LB_MIRROR_CHROOT_SECURITY="${LB_MIRROR_CHROOT_SECURITY:-${LB_MIRROR_CHROOT}}"
 			;;
 	esac
@@ -361,12 +361,12 @@ Set_defaults ()
 	# Setting mirror which ends up in the image
 	case "${LB_MODE}" in
 		debian)
-			LB_MIRROR_BINARY="${LB_MIRROR_BINARY:-http://deb.parrotsec.org/parrot/}"
+			LB_MIRROR_BINARY="${LB_MIRROR_BINARY:-http://deb.debian.org/debian/}"
 			LB_PARENT_MIRROR_BINARY="${LB_PARENT_MIRROR_BINARY:-${LB_MIRROR_BINARY}}"
 			;;
 
 		progress-linux)
-			LB_PARENT_MIRROR_BINARY="${LB_PARENT_MIRROR_BINARY:-http://deb.parrotsec.org/parrot/}"
+			LB_PARENT_MIRROR_BINARY="${LB_PARENT_MIRROR_BINARY:-http://deb.debian.org/debian/}"
 			LB_MIRROR_BINARY="${LB_MIRROR_BINARY:-${LB_MIRROR_CHROOT}}"
 			;;
 	esac
@@ -374,12 +374,12 @@ Set_defaults ()
 	# Setting security mirror which ends up in the image
 	case "${LB_MODE}" in
 		debian)
-			LB_MIRROR_BINARY_SECURITY="${LB_MIRROR_BINARY_SECURITY:-http://security.parrotsec.org/}"
+			LB_MIRROR_BINARY_SECURITY="${LB_MIRROR_BINARY_SECURITY:-http://security.debian.org/}"
 			LB_PARENT_MIRROR_BINARY_SECURITY="${LB_PARENT_MIRROR_BINARY_SECURITY:-${LB_MIRROR_BINARY_SECURITY}}"
 			;;
 
 		progress-linux)
-			LB_PARENT_MIRROR_BINARY_SECURITY="${LB_PARENT_MIRROR_BINARY_SECURITY:-http://security.parrotsec.org/}"
+			LB_PARENT_MIRROR_BINARY_SECURITY="${LB_PARENT_MIRROR_BINARY_SECURITY:-http://security.debian.org/}"
 			LB_MIRROR_BINARY_SECURITY="${LB_MIRROR_BINARY_SECURITY:-${LB_MIRROR_CHROOT}}"
 			;;
 	esac
@@ -408,32 +408,32 @@ Set_defaults ()
 	LB_INTERACTIVE="${LB_INTERACTIVE:-false}"
 
 	# Setting keyring packages
-	LB_KEYRING_PACKAGES="${LB_KEYRING_PACKAGES:-parrot-archive-keyring}"
+	LB_KEYRING_PACKAGES="${LB_KEYRING_PACKAGES:-debian-archive-keyring}"
 
 	# Setting linux flavour string
 	case "${LB_ARCHITECTURES}" in
 		arm64)
-			LB_LINUX_FLAVOURS="${LB_LINUX_FLAVOURS:-arm64}"
+			LB_LINUX_FLAVOURS_WITH_ARCH="${LB_LINUX_FLAVOURS_WITH_ARCH:-arm64}"
 			;;
 
 		armel)
 			# armel will have special images: one rootfs image and many additional kernel images.
 			# therefore we default to all available armel flavours
-			LB_LINUX_FLAVOURS="${LB_LINUX_FLAVOURS:-marvell}"
+			LB_LINUX_FLAVOURS_WITH_ARCH="${LB_LINUX_FLAVOURS_WITH_ARCH:-marvell}"
 			;;
 
 		armhf)
 			# armhf will have special images: one rootfs image and many additional kernel images.
 			# therefore we default to all available armhf flavours
-			LB_LINUX_FLAVOURS="${LB_LINUX_FLAVOURS:-armmp armmp-lpae}"
+			LB_LINUX_FLAVOURS_WITH_ARCH="${LB_LINUX_FLAVOURS_WITH_ARCH:-armmp armmp-lpae}"
 			;;
 
 		amd64)
-			LB_LINUX_FLAVOURS="${LB_LINUX_FLAVOURS:-amd64}"
+			LB_LINUX_FLAVOURS_WITH_ARCH="${LB_LINUX_FLAVOURS_WITH_ARCH:-amd64}"
 			;;
 
 		i386)
-                        LB_LINUX_FLAVOURS="${LB_LINUX_FLAVOURS:-686-pae}"
+                        LB_LINUX_FLAVOURS_WITH_ARCH="${LB_LINUX_FLAVOURS_WITH_ARCH:-686-pae}"
 			;;
 
 		ia64)
@@ -444,7 +444,7 @@ Set_defaults ()
 					;;
 
 				*)
-					LB_LINUX_FLAVOURS="${LB_LINUX_FLAVOURS:-itanium}"
+					LB_LINUX_FLAVOURS_WITH_ARCH="${LB_LINUX_FLAVOURS_WITH_ARCH:-itanium}"
 					;;
 			esac
 			;;
@@ -457,7 +457,7 @@ Set_defaults ()
 					;;
 
 				*)
-					LB_LINUX_FLAVOURS="${LB_LINUX_FLAVOURS:-powerpc64 powerpc}"
+					LB_LINUX_FLAVOURS_WITH_ARCH="${LB_LINUX_FLAVOURS_WITH_ARCH:-powerpc64 powerpc}"
 					;;
 			esac
 			;;
@@ -470,7 +470,7 @@ Set_defaults ()
 					;;
 
 				*)
-					LB_LINUX_FLAVOURS="${LB_LINUX_FLAVOURS:-s390x}"
+					LB_LINUX_FLAVOURS_WITH_ARCH="${LB_LINUX_FLAVOURS_WITH_ARCH:-s390x}"
 					;;
 			esac
 			;;
@@ -480,6 +480,14 @@ Set_defaults ()
 			exit 1
 			;;
 	esac
+
+	LB_LINUX_FLAVOURS=""
+	for FLAVOUR in ${LB_LINUX_FLAVOURS_WITH_ARCH}
+	do
+		ARCH_FILTERED_FLAVOUR="$(echo ${FLAVOUR} | awk -F':' '{print $1}')"
+		LB_LINUX_FLAVOURS="${LB_LINUX_FLAVOURS:+$LB_LINUX_FLAVOURS }${ARCH_FILTERED_FLAVOUR}"
+	done
+
 
 	# Set linux packages
 	LB_LINUX_PACKAGES="${LB_LINUX_PACKAGES:-linux-image}"
@@ -657,7 +665,7 @@ Set_defaults ()
 	esac
 
 	# Set iso preparer
-	LB_ISO_PREPARER="${LB_ISO_PREPARER:-live-build \$VERSION; https://debian-live.alioth.debian.org/live-build}"
+	LB_ISO_PREPARER="${LB_ISO_PREPARER:-live-build \$VERSION; https://salsa.debian.org/live-team/live-build}"
 
 	# Set iso publisher
 	case "${LB_MODE}" in
@@ -666,7 +674,7 @@ Set_defaults ()
 			;;
 
 		*)
-			LB_ISO_PUBLISHER="${LB_ISO_PUBLISHER:-Live Systems project; https://debian-live.alioth.debian.org/; debian-live@lists.debian.org}"
+			LB_ISO_PUBLISHER="${LB_ISO_PUBLISHER:-Live Systems project; https://wiki.debian.org/DebianLive; debian-live@lists.debian.org}"
 			;;
 	esac
 

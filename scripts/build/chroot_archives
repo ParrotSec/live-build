@@ -212,6 +212,25 @@ EOF
 			fi
 		done
 
+		# Check local archive keys (chroot)
+		if Find_files config/archives/*.key || \
+		   Find_files config/archives/*.key.chroot
+		then
+			for FILE in config/archives/*.key \
+					config/archives/*.key.chroot
+			do
+				if [ -e "${FILE}" ]
+				then
+					if grep -q "PGP PUBLIC KEY BLOCK" "${FILE}"
+					then
+						cp ${FILE} chroot/etc/apt/trusted.gpg.d/$(basename ${FILE}).asc
+					else
+						cp ${FILE} chroot/etc/apt/trusted.gpg.d/$(basename ${FILE}).gpg
+					fi
+				fi
+			done
+		fi
+
 		# Configure local package repository
 		if Find_files config/packages.chroot/*.deb || Find_files config/packages/*.deb
 		then
@@ -344,25 +363,6 @@ EOF
 				Chroot chroot "apt-get ${APT_OPTIONS} install aptitude"
 			fi
 		else # Get fresh indices
-			# Check local archive keys
-			if Find_files config/archives/*.key || \
-			   Find_files config/archives/*.key.chroot
-			then
-				for FILE in config/archives/*.key \
-					    config/archives/*.key.chroot
-				do
-					if [ -e "${FILE}" ]
-					then
-						if grep -q "PGP PUBLIC KEY BLOCK" "${FILE}"
-						then
-							cp ${FILE} chroot/etc/apt/trusted.gpg.d/$(basename ${FILE}).asc
-						else
-							cp ${FILE} chroot/etc/apt/trusted.gpg.d/$(basename ${FILE}).gpg
-						fi
-					fi
-				done
-			fi
-
 			# Check local keyring packages
 			if Find_files config/archives/*.deb
 			then

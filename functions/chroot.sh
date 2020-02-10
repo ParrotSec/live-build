@@ -36,3 +36,20 @@ Chroot ()
 
 	return "${?}"
 }
+
+Chroot_has_package() {
+	PACKAGE="${1}"; shift
+	CHROOT="${2:-chroot}"; shift
+
+	if dpkg-query --admindir=${CHROOT}/var/lib/dpkg -s ${PACKAGE} >/dev/null 2>&1 | grep -q "^Status: install"
+	then
+		return 0
+	fi
+	return 1
+}
+
+Chroot_package_list() {
+	CHROOT="${1:-chroot}"; shift
+
+	dpkg-query --admindir=${CHROOT}/var/lib/dpkg -W -f'${Package}\n'
+}

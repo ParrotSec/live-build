@@ -1,3 +1,137 @@
+live-build (1:20191221parrot1) rolling-testing; urgency=medium
+
+  * Import new Debian release.
+  * Don't delete resolvconf tail.
+
+ -- Lorenzo "Palinuro" Faletra <palinuro@parrotsec.org>  Mon, 10 Feb 2020 03:13:26 +0100
+
+live-build (1:20191221kali3) kali-dev; urgency=medium
+
+  * Standardize on having the GUI installation first in boot menus
+
+ -- Raphaël Hertzog <hertzog@debian.org>  Thu, 23 Jan 2020 16:50:01 +0100
+
+live-build (1:20191221kali2) kali-dev; urgency=medium
+
+  * Get rid of extraneous whitespace showing up in syslinux menu
+
+ -- Raphaël Hertzog <raphael@offensive-security.com>  Wed, 22 Jan 2020 15:03:54 +0100
+
+live-build (1:20191221kali1) kali-dev; urgency=medium
+
+  * Synchronize with Debian. Remaining changes:
+    - XORRISO options for EFI boot
+
+ -- Raphaël Hertzog <raphael@offensive-security.com>  Thu, 19 Dec 2019 21:19:22 +0100
+
+live-build (1:20191221) unstable; urgency=medium
+
+  * Revert some Kali-specific change in scripts/build/binary_iso
+
+ -- Raphaël Hertzog <raphael@offensive-security.com>  Thu, 19 Dec 2019 21:07:22 +0100
+
+live-build (1:20191220) unstable; urgency=medium
+
+  * Fix "--debian-installer cdrom" and its interaction with binary_package-lists
+    apt-ftparchive is not able to differentiate between .deb and .udeb so
+    we have to install them in different pool directories so that we can
+    regenerate the Packages files without having the .udeb show up
+    unexpectedly.
+    Since binary_package-lists can overwrite the Packages files generated
+    in installer_debian-installer we have to ensure that it also updates
+    the Release file created formerly.
+    Ideally we should find a way to avoid the duplication of this logic.
+  * Bump Standards-Version to 4.4.1
+  * Switch to debhelper compat level 12
+
+ -- Raphaël Hertzog <raphael@offensive-security.com>  Thu, 19 Dec 2019 19:16:08 +0100
+
+live-build (1:20191219) unstable; urgency=medium
+
+  [ Adrian Gibanel Lopez ]
+  * Fixed foreign architecture package support to linux kernel flavours
+    (Closes: #884553)
+
+  [ Matthijs Kooijman ]
+  * Remove --templates from lb_config manpage
+  * Remove ldlinux.c32 for extlinux and syslinux
+
+  [ Roland Clobus ]
+  * Updated URL in many places.
+  * Reenabled the command line option for colored messages for all scripts.
+    The functionality was added 2008-11-01, but was not really active.
+  * Removed obsolete short command line options. -f was --filesystem -l was
+    --language -p was --package-list -e was --encryption
+  * Do not store _QUIET in the configuration file, otherwise the overrides in
+    the command line get ignored. Adds a documentation line for the other
+    command line options as well.
+  * Removed option none for --apt-indices, which was removed in 3.0.2-1.
+  * Removed option --bootstrap, which is not implemented.
+  * Mention --breakpoints in 'lb config --help'
+  * Fixed a typo for --clean in 'lb config --help'
+  * Manpage: --binary-filesystem also accepts ntfs
+  * Matched the documentation of --checksums to the implementation in live-boot
+  * Manpage: Added documentation for --breakpoints
+  * Manpage: --compression also accepts xz. The default is none
+  * Manpage: --config synchronised to 'lb config --help'
+  * Manpage: Added documentation for --zsync
+  * Manpage: Removed references to command line options that are no longer in
+    the code: --firmware-binary --firmware-chroot --hooks
+    --parent-mirror-chroot-updates --parent-mirror-chroot-backports
+    --parent-mirror-binary-updates --parent-mirror-binary-backports
+    --mirror-chroot-updates --mirror-chroot-backports --mirror-binary-updates
+    --mirror-binary-backports --templates
+  * --initramfs support none and live-boot
+  * Manpage: Added documentation for --initsystem
+  * Manpage: Added documentation for --image-name
+  * Manpage: Added documentation for --hdd-label, --hdd-size and
+    --hdd-partition-start
+  * Manpage: --mode explicitly supports debian and progress-linux. Special
+    handling for ubuntu was dropped 2015-05-03
+  * Manpage: --parent-archive-areas uses the same argument name as 'lb config
+    --help'
+  * Manpage: Added documentation for --firmware-binary and --firmware-chroot
+  * Manpage: Added documentation for --swap-file-path and --swap-file-size
+  * Manpage: Added documentation for --loadlin
+  * Manpage: Added documentation for --bootstrap-qemu-[arch|exclude|static]
+  * Reordered the command line options to make them in alphabetical order
+  * Manpage: added missing \fR tags
+  * Manpage: consistent use of whitespace in the command line option list
+  * Manpage: typo
+  * Manpage: Use alphabetical order for the description of the command line
+    options
+  * --mirror-binary* was not properly sorted
+  * Manpage: removed incorrect mentioning of the -d command line option
+  * Manpage: removed FIXME for the SYNOPSIS section, all options are now
+    listed
+  * Manpage: the configuration directory (config) cannot be modified
+  * Manpage: simplify the description
+  * Manpage: use 3rd person form when describing an option
+  * Manpage: Update the default values of --mirror-* and --parent-mirror-*
+
+  [ adrian15 ]
+  * Readd findiso parametre to loopback.cfg generation.
+
+  [ Raphaël Hertzog ]
+  * binary_package-lists: avoid messing with dpkg's status file
+  * chroot_live-packages: use dpkg-query to see if a package is installed
+    (Closes: #944983)
+  * Set default distribution to buster.
+    Thanks to Алексей Шилин (Closes: #934495)
+  * installer_debian-installer: don't mess with /var/lib/dpkg/status
+  * Tweak lintian overrides
+  * Support --distribution-binary and --distribution-chroot (Closes: #888507)
+  * Update my email in the Maintainer field.
+
+  [ Ronny Standtke ]
+  * Run binary_hooks after binary_grub-efi (Closes: #940846)
+
+  [ John Estabrook ]
+  * Add local archive keys before configuring local package repository
+    (Closes: #941691)
+
+ -- Raphaël Hertzog <raphael@offensive-security.com>  Thu, 19 Dec 2019 18:56:00 +0100
+
 live-build (1:20190311parrot1) testing; urgency=medium
 
   * Import new Debian release.

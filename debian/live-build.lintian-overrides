@@ -1,2 +1,6 @@
 live-build: symlink-should-be-relative
-live-build: depends-on-essential-package-without-using-version suggests: e2fsprogs
+# Those cases are legitimate uses of direct access to the database
+live-build: uses-dpkg-database-directly usr/lib/live/build/chroot_tmpfs
+live-build: uses-dpkg-database-directly usr/lib/live/build/clean
+live-build: uses-dpkg-database-directly usr/share/live/build/functions/chroot.sh
+live-build: uses-dpkg-database-directly usr/share/live/build/hooks/normal/0110-remove-backup-files.hook.chroot

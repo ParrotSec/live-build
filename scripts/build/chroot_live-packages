@@ -53,7 +53,7 @@ case "${LB_INITSYSTEM}" in
 	systemd)
 		_PACKAGES="${_PACKAGES} systemd-sysv"
 
-		if [ -e chroot/var/lib/dpkg/info/sysvinit.list ]
+		if Chroot_has_package sysvinit
 		then
 			Chroot chroot "dpkg --force-remove-essential --purge sysvinit"
 		fi
@@ -62,7 +62,7 @@ case "${LB_INITSYSTEM}" in
 	sysvinit)
 		_PACKAGES="${_PACKAGES} sysvinit"
 
-		if [ -e chroot/var/lib/dpkg/info/systemd-sysv.list ]
+		if Chroot_has_package systemd-sysv
 		then
 			Chroot chroot "dpkg --force-remove-essential --purge systemd systemd-sysv"
 		fi

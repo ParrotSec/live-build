@@ -1,18 +1,18 @@
 Source: live-build
 Section: misc
 Priority: optional
-Maintainer: Debian Live <debian-live@lists.debian.org>
-Uploaders: Raphaël Hertzog <hertzog@debian.org>,
- Luca Boccassi <bluca@debian.org>,
+XSBC-Original-Maintainer: Debian Live <debian-live@lists.debian.org>
+Maintainer: Parrot Team <team@parrotsec.org>
+Uploaders: Lorenzo "Palinuro" Faletra <palinuro@parrotsec.org>
 Build-Depends:
- debhelper (>= 10~),
+ debhelper-compat (= 12),
  po4a,
  gettext,
-Standards-Version: 4.3.0
+Standards-Version: 4.4.1
 Rules-Requires-Root: no
-Homepage: https://debian-live.alioth.debian.org/live-build/
-Vcs-Browser: https://salsa.debian.org/live-team/live-build
-Vcs-Git: https://salsa.debian.org/live-team/live-build.git
+Homepage: https://wiki.debian.org/DebianLive
+Vcs-Browser: https://nest.parrot.sh/packages/debian/live-build
+Vcs-Git: https://nest.parrot.sh/packages/debian/live-build.git
 
 Package: live-build
 Architecture: all
