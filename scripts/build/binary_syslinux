@@ -1,6 +1,7 @@
 #!/bin/sh
 
 ## live-build(7) - System Build Scripts
+## Copyright (C) 2016-2020 The Debian Live team
 ## Copyright (C) 2006-2015 Daniel Baumann <mail@daniel-baumann.ch>
 ##
 ## This program comes with ABSOLUTELY NO WARRANTY; for details see COPYING.
@@ -14,56 +15,45 @@ set -e
 [ -e "${LIVE_BUILD}/scripts/build.sh" ] && . "${LIVE_BUILD}/scripts/build.sh" || . /usr/lib/live/build.sh
 
 # Setting static variables
-DESCRIPTION="$(Echo 'installs syslinux into binary')"
-HELP=""
+DESCRIPTION="Installs syslinux into binary"
 USAGE="${PROGRAM} [--force]"
 
-Arguments "${@}"
+# Processing arguments and configuration files
+Init_config_data "${@}"
 
-# Reading configuration files
-Read_conffiles config/all config/common config/bootstrap config/chroot config/binary config/source
-Set_defaults
-
-Check_Any_Bootloader_Role "syslinux"
+if [ "${LB_BOOTLOADER_BIOS}" != "syslinux" ]; then
+	exit 0
+fi
 
 Echo_message "Begin installing syslinux..."
 
 # Requiring stage file
-Require_stagefile .build/config .build/bootstrap
+Require_stagefiles config bootstrap
 
 # Checking stage file
-Check_stagefile .build/binary_syslinux
+Check_stagefile
 
-# Checking lock file
-Check_lockfile .lock
-
-# Creating lock file
-Create_lockfile .lock
+# Acquire lock file
+Acquire_lockfile
 
 # Check architecture
 Check_architectures amd64 i386
 Check_crossarchitectures
 
 case "${LB_INITRAMFS}" in
-	*)
+	live-boot)
 		_INITRAMFS="live"
+		;;
+	*)
+		_INITRAMFS="boot"
 		;;
 esac
 
 # Assembling image specifics
-case "${LIVE_IMAGE_TYPE}" in
-	iso*)
+case "${LB_IMAGE_TYPE}" in
+	iso|iso-hybrid)
 		_BOOTLOADER="isolinux"
-
-		case "${LB_MODE}" in
-			progress-linux)
-				_TARGET="binary/boot"
-				;;
-
-			*)
-				_TARGET="binary/isolinux"
-				;;
-		esac
+		_TARGET="binary/isolinux"
 		;;
 
 	netboot)
@@ -71,24 +61,15 @@ case "${LIVE_IMAGE_TYPE}" in
 		_TARGET="tftpboot"
 		;;
 
-	hdd*|*)
+	hdd|tar)
 		case ${LB_BINARY_FILESYSTEM} in
 			fat*|ntfs)
-				_BOOTLOADER=syslinux
-
-				case "${LB_MODE}" in
-					progress-linux)
-						_TARGET="binary/boot"
-						;;
-
-					*)
-						_TARGET="binary/syslinux"
-						;;
-				esac
+				_BOOTLOADER="syslinux"
+				_TARGET="binary/syslinux"
 				;;
 
 			ext[234]|btrfs)
-				_BOOTLOADER=extlinux
+				_BOOTLOADER="extlinux"
 				_TARGET="binary/boot/extlinux"
 				;;
 			*)
@@ -99,53 +80,79 @@ case "${LIVE_IMAGE_TYPE}" in
 		;;
 esac
 
-if [ -e "config/bootloaders/${_BOOTLOADER}" ]
-then
-	# Internal local copy
-	_SOURCE="config/bootloaders/${_BOOTLOADER}"
+# User config replacement/additional files
+_SOURCE_USER="config/bootloaders/${_BOOTLOADER}"
+_SOURCE_USER_COMMON="config/bootloaders/syslinux_common"
+
+if [ -n "${LIVE_BUILD}" ]; then
+	_SOURCE="${LIVE_BUILD}/share/bootloaders/${_BOOTLOADER}"
+	_SOURCE_COMMON="${LIVE_BUILD}/share/bootloaders/syslinux_common"
 else
-	# Internal system copy
-	if [ -n "${LIVE_BUILD}" ]
-	then
-		_SOURCE="${LIVE_BUILD}/share/bootloaders/${_BOOTLOADER}"
-	else
-		_SOURCE="/usr/share/live/build/bootloaders/${_BOOTLOADER}"
-	fi
+	_SOURCE="/usr/share/live/build/bootloaders/${_BOOTLOADER}"
+	_SOURCE_COMMON="/usr/share/live/build/bootloaders/syslinux_common"
 fi
 
 # Checking depends
 Check_package chroot /usr/lib/$(echo ${_BOOTLOADER} | tr [a-z] [A-Z]) ${_BOOTLOADER}
 Check_package chroot /usr/lib/syslinux syslinux-common
-
-if ls "${_SOURCE}"/*.svg* > /dev/null 2>&1
-then
-	Check_package chroot /usr/bin/rsvg-convert librsvg2-bin
-fi
+Check_package chroot /usr/bin/rsvg-convert librsvg2-bin
 
 # Restoring cache
-Restore_cache cache/packages.binary
+Restore_package_cache binary
 
 # Installing depends
-Install_package
+Install_packages
+
+# Ensure fresh
+rm -rf ${_TARGET}
+mkdir -p ${_TARGET}
 
 # Copying files
 case "${LB_BUILD_WITH_CHROOT}" in
 	true)
-		mkdir -p ${_TARGET}
+		# Ensure fresh
+		rm -rf chroot/root/${_BOOTLOADER}
+		rm -rf chroot/root/${_BOOTLOADER}.tmp
+		mkdir -p chroot/root/${_BOOTLOADER}
 
 		# Copy in two steps since the theme can have absolute symlinks and would therefore not be dereferenced correctly
-		cp -a ${_SOURCE} chroot/root
-		Chroot chroot cp -aL /root/$(basename ${_SOURCE}) /root/$(basename ${_SOURCE}).tmp > /dev/null 2>&1 || true
-		cp -a chroot/root/$(basename ${_SOURCE}).tmp/* ${_TARGET}
-		rm -rf chroot/root/$(basename ${_SOURCE}) chroot/root/$(basename ${_SOURCE}).tmp
+		cp -a ${_SOURCE_COMMON}/* chroot/root/${_BOOTLOADER}/
+		cp -af ${_SOURCE}/* chroot/root/${_BOOTLOADER}/
+		if [ -e "${_SOURCE_USER_COMMON}" ]; then
+			cp -af ${_SOURCE_USER_COMMON}/* chroot/root/${_BOOTLOADER}/
+		fi
+		if [ -e "${_SOURCE_USER}" ]; then
+			cp -af ${_SOURCE_USER}/* chroot/root/${_BOOTLOADER}/
+		fi
+		Chroot chroot cp -aL /root/${_BOOTLOADER} /root/${_BOOTLOADER}.tmp > /dev/null 2>&1 || true
+		cp -a chroot/root/${_BOOTLOADER}.tmp/* ${_TARGET}
+		rm -rf chroot/root/${_BOOTLOADER} chroot/root/${_BOOTLOADER}.tmp
 		;;
 
 	false)
-		mkdir -p ${_TARGET}
-
-		cp -aL ${_SOURCE}/* ${_TARGET} > /dev/null 2>&1 || true
+		cp -aL ${_SOURCE_COMMON}/* ${_TARGET} > /dev/null 2>&1 || true
+		cp -aLf ${_SOURCE}/* ${_TARGET} > /dev/null 2>&1 || true
+		if [ -e "${_SOURCE_USER_COMMON}" ]; then
+			cp -aLf ${_SOURCE_USER_COMMON}/* ${_TARGET} > /dev/null 2>&1 || true
+		fi
+		if [ -e "${_SOURCE_USER}" ]; then
+			cp -aLf ${_SOURCE_USER}/* ${_TARGET} > /dev/null 2>&1 || true
+		fi
 		;;
 esac
+
+# Use correct install menu set
+if [ "${LB_DEBIAN_INSTALLER_GUI}" = "true" ]; then
+	rm "${_TARGET}"/install_text.cfg
+	mv "${_TARGET}"/install_gui.cfg "${_TARGET}"/install.cfg
+else
+	rm "${_TARGET}"/install_gui.cfg
+	mv "${_TARGET}"/install_text.cfg "${_TARGET}"/install.cfg
+fi
+# Move user advanced.cfg to utilities.cfg for backwards compatibility
+if [ -e "${_TARGET}"/advanced.cfg ]; then
+	mv -f "${_TARGET}"/advanced.cfg "${_TARGET}"/utilities.cfg
+fi
 
 # Configuring files
 if [ -e "${_TARGET}/live.cfg.in" ]
@@ -155,10 +162,11 @@ then
 
 	case "${_FLAVOURS}" in
 		1)
+			# Rename kernel files
 			# If multiple initrd images are being generated (by DKMS packages, etc),
 			# we likely only want the latest version.
-			ln $(ls -r1 --sort=version binary/${_INITRAMFS}/vmlinuz-* | head -n 1) binary/${_INITRAMFS}/vmlinuz
-			ln $(ls -r1 --sort=version binary/${_INITRAMFS}/initrd.img-* | head -n 1) binary/${_INITRAMFS}/initrd.img
+			ln -f $(ls -r1 --sort=version binary/${_INITRAMFS}/vmlinuz-* | head -n 1) binary/${_INITRAMFS}/vmlinuz
+			ln -f $(ls -r1 --sort=version binary/${_INITRAMFS}/initrd.img-* | head -n 1) binary/${_INITRAMFS}/initrd.img
 
 			sed -e "s|@FLAVOUR@|${LB_LINUX_FLAVOURS}|g" \
 			    -e "s|@LINUX@|/${_INITRAMFS}/vmlinuz|g" \
@@ -175,8 +183,11 @@ then
 			do
 				_NUMBER="$((${_NUMBER} + 1))"
 
-				ln binary/${_INITRAMFS}/vmlinuz-*-${_FLAVOUR} binary/${_INITRAMFS}/vmlinuz${_NUMBER}
-				ln binary/${_INITRAMFS}/initrd.img-*-${_FLAVOUR} binary/${_INITRAMFS}/initrd${_NUMBER}.img
+				# Rename kernel files
+				# If multiple initrd images are being generated (by DKMS packages, etc),
+				# we likely only want the latest version.
+				ln -f $(ls -r1 --sort=version binary/${_INITRAMFS}/vmlinuz-*-${_FLAVOUR} | head -n 1) binary/${_INITRAMFS}/vmlinuz${_NUMBER}
+				ln -f $(ls -r1 --sort=version binary/${_INITRAMFS}/initrd.img-*-${_FLAVOUR} | head -n 1) binary/${_INITRAMFS}/initrd${_NUMBER}.img
 
 				if [ "${_NUMBER}" -gt 1 ]
 				then
@@ -205,32 +216,24 @@ fi
 _VERSION="${_VERSION:-none}"
 
 _DISTRIBUTION="${LB_DISTRIBUTION_BINARY}"
-_ARCHITECTURE="${LB_ARCHITECTURES}"
 
-_DATE=$(date -R)
-_YEAR="$(date +%Y)"
-_MONTH="$(date +%m)"
-_DAY="$(date +%d)"
-_HOUR="$(date +%H)"
-_MINUTE="$(date +%M)"
-_SECOND="$(date +%S)"
+_DATE="$(date $DATE_UTC_OPTION -R -d@${SOURCE_DATE_EPOCH})"
+_YEAR="$(date $DATE_UTC_OPTION -d "${_DATE}" +%Y)"
+_MONTH="$(date $DATE_UTC_OPTION -d "${_DATE}" +%m)"
+_DAY="$(date $DATE_UTC_OPTION -d "${_DATE}" +%d)"
+_HOUR="$(date $DATE_UTC_OPTION -d "${_DATE}" +%H)"
+_MINUTE="$(date $DATE_UTC_OPTION -d "${_DATE}" +%M)"
+_SECOND="$(date $DATE_UTC_OPTION -d "${_DATE}" +%S)"
+_TIMEZONE="$(date $DATE_UTC_OPTION -d "${_DATE}" +%Z)"
+_TIMEZONE_NUM="$(date $DATE_UTC_OPTION -d "${_DATE}" +%z)"
 
 _LINUX_VERSIONS="$(for _LINUX in chroot/boot/vmlinuz-* ; do chroot chroot apt-cache policy $(basename ${_LINUX} | sed -e 's|vmlinuz-|linux-image-|') | awk '/Installed: / { print $2 }' ; done | sort -Vru | tr "\n" " ")"
 
-_LIVE_BUILD_VERSION="$(lb --version)"
 _LIVE_BOOT_VERSION="$(chroot chroot apt-cache policy live-boot | awk '/Installed: / { print $2 }')"
 _LIVE_CONFIG_VERSION="$(chroot chroot apt-cache policy live-config | awk '/Installed: / { print $2 }')"
 _LIVE_TOOLS_VERSION="$(chroot chroot apt-cache policy live-tools | awk '/Installed: / { print $2 }')"
 
-case "${LB_MODE}" in
-	progress-linux)
-		_PROJECT="Progress Linux"
-		;;
-
-	*)
-		_PROJECT="Debian GNU/Linux"
-		;;
-esac
+_PROJECT="Debian GNU/Linux"
 
 for _FILE in "${_TARGET}"/*.cfg ${_TARGET}/*.svg
 do
@@ -239,12 +242,11 @@ do
 		sed -i  -e "s#@APPEND_LIVE@#${LB_BOOTAPPEND_LIVE}#g" \
 			-e "s#@APPEND_LIVE_FAILSAFE@#${LB_BOOTAPPEND_LIVE_FAILSAFE}#g" \
 			-e "s#@APPEND_INSTALL@#${LB_BOOTAPPEND_INSTALL}#g" \
-			-e "s#@APPEND_INSTALL_FAILSAFE@#${LB_BOOTAPPEND_INSTALL_FAILSAFE}#g" \
 			-e "s|@PROJECT@|${_PROJECT}|g" \
 			-e "s|@DISTRIBUTION@|${_DISTRIBUTION}|g" \
 			-e "s|@PARENT_DISTRIBUTION@|${LB_PARENT_DISTRIBUTION_BINARY}|g" \
 			-e "s|@VERSION@|${_VERSION}|g" \
-			-e "s|@ARCHITECTURE@|${_ARCHITECTURE}|g" \
+			-e "s|@ARCHITECTURE@|${LB_ARCHITECTURE}|g" \
 			-e "s|@DATE@|${_DATE}|g" \
 			-e "s|@YEAR@|${_YEAR}|g" \
 			-e "s|@MONTH@|${_MONTH}|g" \
@@ -252,8 +254,10 @@ do
 			-e "s|@HOUR@|${_HOUR}|g" \
 			-e "s|@MINUTE@|${_MINUTE}|g" \
 			-e "s|@SECOND@|${_SECOND}|g" \
+			-e "s|@TIMEZONE@|${_TIMEZONE}|g" \
+			-e "s|@TIMEZONE_NUM@|${_TIMEZONE_NUM}|g" \
 			-e "s|@LINUX_VERSIONS@|${_LINUX_VERSIONS}|g" \
-			-e "s|@LIVE_BUILD_VERSION@|${_LIVE_BUILD_VERSION}|g" \
+			-e "s|@LIVE_BUILD_VERSION@|${LIVE_BUILD_VERSION}|g" \
 			-e "s|@LIVE_BOOT_VERSION@|${_LIVE_BOOT_VERSION}|g" \
 			-e "s|@LIVE_CONFIG_VERSION@|${_LIVE_CONFIG_VERSION}|g" \
 			-e "s|@LIVE_TOOLS_VERSION@|${_LIVE_TOOLS_VERSION}|g" \
@@ -261,7 +265,38 @@ do
 	fi
 done
 
-if [ -e "${_TARGET}/splash.svg" ]
+KERNEL_DI="/install/vmlinuz"
+INITRD_DI="/install/initrd.gz"
+KERNEL_GI="/install/gtk/vmlinuz"
+INITRD_GI="/install/gtk/initrd.gz"
+
+sed -i \
+    -e "s|@KERNEL_GI@|${KERNEL_GI}|" \
+    -e "s|@INITRD_GI@|${INITRD_GI}|" \
+    -e "s|@KERNEL_DI@|${KERNEL_DI}|" \
+    -e "s|@INITRD_DI@|${INITRD_DI}|" \
+    "${_TARGET}"/install.cfg
+
+MEMTEST_PATH="${_INITRAMFS}/memtest"
+sed -i -e "s#@MEMTEST_VERSION@#${LB_MEMTEST}#g" -e "s#@MEMTEST@#/${MEMTEST_PATH}#g" "${_TARGET}"/memtest.cfg
+
+# Replace placeholder for optional install menu entries include
+if [ "${LB_DEBIAN_INSTALLER}" = "none" ]; then
+	rm -f "${_TARGET}"/install.cfg
+	sed -i "/@OPTIONAL_INSTALLER_INCLUDE@/d" "${_TARGET}"/menu.cfg
+else
+	sed -i "s#@OPTIONAL_INSTALLER_INCLUDE@#include install.cfg#g" "${_TARGET}"/menu.cfg
+fi
+
+# Replace placeholder for optional memtest menu entry include
+if [ ! -f "binary/${MEMTEST_PATH}" ]; then
+	rm -f "${_TARGET}"/memtest.cfg
+	sed -i -e "/@OPTIONAL_MEMTEST_INCLUDE@/d" "${_TARGET}"/utilities.cfg
+else
+	sed -i -e "s#@OPTIONAL_MEMTEST_INCLUDE@#include memtest.cfg#g" "${_TARGET}"/utilities.cfg
+fi
+
+if [ -e "${_TARGET}/splash.svg" ] && [ ! -e "${_TARGET}/splash.png" ]
 then
 	case "${LB_BUILD_WITH_CHROOT}" in
 		true)
@@ -275,38 +310,25 @@ then
 			rsvg-convert --format png --height 480 --width 640 "${_TARGET}/splash.svg" -o "${_TARGET}/splash.png"
 			;;
 	esac
-
-	rm -f "${_TARGET}/splash.svg"
 fi
+rm -f "${_TARGET}/splash.svg"
 
-# Tweak the grub theme to reuse the syslinux background image
-if [ -e binary/boot/grub/live-theme/theme.txt ]; then
-    sed -i -e 's|^desktop-image:.*|desktop-image: "/isolinux/splash.png"|' \
+# Tweak the grub theme to reuse the syslinux background image if grub doesn't have its own
+if [ -e binary/boot/grub/live-theme/theme.txt ] && [ ! -e binary/boot/grub/splash.png ]; then
+	sed -i -e 's|^desktop-image:.*|desktop-image: "/isolinux/splash.png"|' \
 	-e 's|^title-text:.*|title-text: ""|' \
 	binary/boot/grub/live-theme/theme.txt
 fi
 
-case "${LB_MODE}" in
-	progress-linux)
-		for _FILE in "${_TARGET}/isolinux.bin" "${_TARGET}/isolinux.cfg" "${_TARGET}/syslinux.cfg"
-		do
-			if [ -e "${_FILE}" ]
-			then
-				mv "${_FILE}" "${_TARGET}/$(echo ${_FILE} | sed -e 's|.*linux|boot|')"
-			fi
-		done
-		;;
-esac
-
 case "${LB_BUILD_WITH_CHROOT}" in
 	true)
 		# Saving cache
-		Save_cache cache/packages.binary
+		Save_package_cache binary
 
 		# Removing depends
-		Remove_package
+		Remove_packages
 		;;
 esac
 
 # Creating stage file
-Create_stagefile .build/binary_syslinux
+Create_stagefile

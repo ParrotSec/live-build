@@ -8,7 +8,7 @@ set -e
 # is not allowed to, and (b) it wants to build the index in the background which
 # will be racy in the context of live-build.
 
-if [ -x /usr/sbin/update-apt-xapian-index ]
+if command -v update-apt-xapian-index >/dev/null
 then
-	PYTHONDONTWRITEBYTECODE=1 /usr/sbin/update-apt-xapian-index --force --quiet
+	PYTHONDONTWRITEBYTECODE=1 update-apt-xapian-index --force --quiet
 fi

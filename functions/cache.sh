@@ -1,6 +1,7 @@
 #!/bin/sh
 
 ## live-build(7) - System Build Scripts
+## Copyright (C) 2016-2020 The Debian Live team
 ## Copyright (C) 2006-2015 Daniel Baumann <mail@daniel-baumann.ch>
 ##
 ## This program comes with ABSOLUTELY NO WARRANTY; for details see COPYING.
@@ -8,9 +9,9 @@
 ## under certain conditions; see COPYING for details.
 
 
-Restore_cache ()
+Restore_package_cache ()
 {
-	DIRECTORY="${1}"
+	local DIRECTORY="cache/packages.${1}"
 
 	if [ "${LB_CACHE}" = "true" ] && [ "${LB_CACHE_PACKAGES}" = "true" ]
 	then
@@ -20,18 +21,18 @@ Restore_cache ()
 			if [ "$(stat --printf %d ${DIRECTORY}/)" = "$(stat --printf %d chroot/var/cache/apt/archives/)" ]
 			then
 				# with hardlinks
-				find "${DIRECTORY}" -name "*.deb" | xargs cp -fl -t chroot/var/cache/apt/archives
+				find "${DIRECTORY}" -name "*.deb" -print0 | xargs -0 --no-run-if-empty cp -fl -t chroot/var/cache/apt/archives
 			else
 				# without hardlinks
-				find "${DIRECTORY}" -name "*.deb" | xargs cp -t chroot/var/cache/apt/archives
+				find "${DIRECTORY}" -name "*.deb" -print0 | xargs -0 --no-run-if-empty cp -t chroot/var/cache/apt/archives
 			fi
 		fi
 	fi
 }
 
-Save_cache ()
+Save_package_cache ()
 {
-	DIRECTORY="${1}"
+	local DIRECTORY="cache/packages.${1}"
 
 	if [ "${LB_CACHE}" = "true" ] && [ "${LB_CACHE_PACKAGES}" = "true" ]
 	then
@@ -46,6 +47,7 @@ Save_cache ()
 			mkdir -p "${DIRECTORY}"
 
 			# Saving new cache
+			local PACKAGE
 			for PACKAGE in chroot/var/cache/apt/archives/*.deb
 			do
 				if [ -e "${DIRECTORY}"/"$(basename ${PACKAGE})" ]

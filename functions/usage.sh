@@ -1,6 +1,7 @@
 #!/bin/sh
 
 ## live-build(7) - System Build Scripts
+## Copyright (C) 2016-2020 The Debian Live team
 ## Copyright (C) 2006-2015 Daniel Baumann <mail@daniel-baumann.ch>
 ##
 ## This program comes with ABSOLUTELY NO WARRANTY; for details see COPYING.
@@ -10,22 +11,32 @@
 
 Usage ()
 {
-	printf "%s - %s\n" "${PROGRAM}" "${DESCRIPTION}"
-	echo
-	Echo "Usage:"
-	echo
+	echo "${PROGRAM_NAME} - ${DESCRIPTION}"
+	printf "\nUsage:\n\n"
 
-	if [ -n "${USAGE}" ]
-	then
-		Echo " ${USAGE}"
-		echo
+	if [ -n "${USAGE}" ]; then
+		# printf without placeholder required here for correct \t and \n formatting of `lb config` usage string
+		printf "  ${USAGE}\n"
 	fi
 
-	printf "  %s [-h|--help]\n" "${PROGRAM}"
-	printf "  %s [-u|--usage]\n" "${PROGRAM}"
-	printf "  %s [-v|--version]\n" "${PROGRAM}"
+	echo "  ${PROGRAM} [-h|--help]"
+	echo "  ${PROGRAM} [-u|--usage]"
+	echo "  ${PROGRAM} [-v|--version]"
 	echo
-	Echo "Try \"%s --help\" for more information." "${PROGRAM}"
+	echo "Try \"${PROGRAM} --help\" for more information."
 
-	exit 1
+	case $1 in
+		--fail)
+			exit 1
+			;;
+		--exit)
+			exit 0
+			;;
+		"")
+			:
+			;;
+		*)
+			Echo_error "Unexpected parameter to Usage(): $1"
+			;;
+	esac
 }

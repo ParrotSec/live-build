@@ -1,6 +1,7 @@
 #!/bin/sh
 
 ## live-build(7) - System Build Scripts
+## Copyright (C) 2016-2020 The Debian Live team
 ## Copyright (C) 2006-2015 Daniel Baumann <mail@daniel-baumann.ch>
 ##
 ## This program comes with ABSOLUTELY NO WARRANTY; for details see COPYING.
@@ -14,17 +15,13 @@ set -e
 [ -e "${LIVE_BUILD}/scripts/build.sh" ] && . "${LIVE_BUILD}/scripts/build.sh" || . /usr/lib/live/build.sh
 
 # Setting static variables
-DESCRIPTION="$(Echo 'build zsync control files')"
-HELP=""
+DESCRIPTION="Build zsync control files"
 USAGE="${PROGRAM} [--force]"
 
-Arguments "${@}"
+# Processing arguments and configuration files
+Init_config_data "${@}"
 
-# Reading configuration files
-Read_conffiles config/all config/common config/bootstrap config/chroot config/binary config/source
-Set_defaults
-
-if [ "${LIVE_IMAGE_TYPE}" != "iso" ] && [ "${LIVE_IMAGE_TYPE}" != "iso-hybrid" ]
+if [ "${LB_IMAGE_TYPE}" != "iso" ] && [ "${LB_IMAGE_TYPE}" != "iso-hybrid" ]
 then
 	exit 0
 fi
@@ -37,45 +34,42 @@ fi
 Echo_message "Begin building zsync control files..."
 
 # Requiring stage file
-Require_stagefile .build/config .build/bootstrap
+Require_stagefiles config bootstrap
 
 # Checking stage file
-Check_stagefile .build/binary_zsync
+Check_stagefile
 
-# Checking lock file
-Check_lockfile .lock
-
-# Creating lock file
-Create_lockfile .lock
+# Acquire lock file
+Acquire_lockfile
 
 # Checking depends
 Check_package chroot /usr/bin/zsyncmake zsync
 
 # Restoring cache
-Restore_cache cache/packages.binary
+Restore_package_cache binary
 
 # Installing depends
-Install_package
+Install_packages
 
-case "${LIVE_IMAGE_TYPE}" in
+case "${LB_IMAGE_TYPE}" in
 	iso)
-		_IMAGES="${LIVE_IMAGE_NAME}-${LB_ARCHITECTURES}.iso"
+		_IMAGES="${LB_IMAGE_NAME}-${LB_ARCHITECTURE}.iso"
 		;;
 
 	iso-hybrid)
-		_IMAGES="${LIVE_IMAGE_NAME}-${LB_ARCHITECTURES}.hybrid.iso"
+		_IMAGES="${LB_IMAGE_NAME}-${LB_ARCHITECTURE}.hybrid.iso"
 		;;
 
 	hdd)
-		_IMAGES="${LIVE_IMAGE_NAME}-${LB_ARCHITECTURES}.img"
+		_IMAGES="${LB_IMAGE_NAME}-${LB_ARCHITECTURE}.img"
 		;;
 
-	net)
-		_IMAGES="${LIVE_IMAGE_NAME}-${LB_ARCHITECTURES}.netboot.tar*"
+	netboot)
+		_IMAGES="${LB_IMAGE_NAME}-${LB_ARCHITECTURE}.netboot.tar*"
 		;;
 
 	tar)
-		_IMAGES="${LIVE_IMAGE_NAME}-${LB_ARCHITECTURES}.tar*"
+		_IMAGES="${LB_IMAGE_NAME}-${LB_ARCHITECTURE}.tar*"
 		;;
 esac
 
@@ -121,10 +115,10 @@ done
 #CHECKSUMS
 
 # Saving cache
-Save_cache cache/packages.binary
+Save_package_cache binary
 
 # Removing depends
-Remove_package
+Remove_packages
 
 # Creating stage file
-Create_stagefile .build/binary_zsync
+Create_stagefile

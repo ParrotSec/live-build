@@ -1,6 +1,7 @@
 #!/bin/sh
 
 ## live-build(7) - System Build Scripts
+## Copyright (C) 2016-2020 The Debian Live team
 ## Copyright (C) 2006-2015 Daniel Baumann <mail@daniel-baumann.ch>
 ##
 ## This program comes with ABSOLUTELY NO WARRANTY; for details see COPYING.
@@ -14,15 +15,39 @@ set -e
 [ -e "${LIVE_BUILD}/scripts/build.sh" ] && . "${LIVE_BUILD}/scripts/build.sh" || . /usr/lib/live/build.sh
 
 # Setting static variables
-DESCRIPTION="$(Echo 'install debian-installer into binary')"
-HELP=""
+DESCRIPTION="Install debian-installer into binary"
 USAGE="${PROGRAM} [--force]"
 
-Arguments "${@}"
+# Processing arguments and configuration files
+Init_config_data "${@}"
 
-# Reading configuration files
-Read_conffiles config/all config/common config/bootstrap config/chroot config/binary config/source
-Set_defaults
+if ! In_list "${LB_DEBIAN_INSTALLER}" cdrom netinst netboot businesscard live; then
+	if [ "${LB_DEBIAN_INSTALLER}" = "none" ]; then
+		Echo_message "No installer wanted, skipping..."
+	fi
+	exit 0
+fi
+
+Echo_message "Begin installing debian-installer..."
+
+# Requiring stage file
+Require_stagefiles config bootstrap
+
+# Checking stage file
+Check_stagefile
+
+# Acquire lock file
+Acquire_lockfile
+
+# Checking depends
+Check_package host /usr/bin/wget wget
+Check_package chroot /usr/bin/apt-ftparchive apt-utils
+
+# Restoring cache
+Restore_package_cache binary
+
+# Installing depends
+Install_packages
 
 if [ "${_DEBUG}" = "true" ]
 then
@@ -34,53 +59,10 @@ else
 	WGET_OPTIONS="${WGET_OPTIONS} --no-verbose"
 fi
 
-# Check d-i configuration
-case "${LB_DEBIAN_INSTALLER}" in
-	true|cdrom|netinst|netboot|businesscard|live)
-		;;
-
-	false)
-		exit 0
-		;;
-
-	*)
-		Echo_error "debian-installer flavour %s not supported." "${LB_DEBIAN_INSTALLER}"
-		exit 1
-		;;
-esac
-
-Echo_message "Begin installing debian-installer..."
-
-# Requiring stage file
-Require_stagefile .build/config .build/bootstrap
-
-# Checking stage file
-Check_stagefile .build/installer_debian-installer
-
-# Checking lock file
-Check_lockfile .lock
-
-# Creating lock file
-Create_lockfile .lock
-
-# Checking depends
-Check_package host /usr/bin/wget wget
-Check_package chroot /usr/bin/apt-ftparchive apt-utils
-
-# Restoring cache
-Restore_cache cache/packages.binary
-
-# Installing depends
-Install_package
-
 # Setting destination directory
-case "${LIVE_IMAGE_TYPE}" in
+case "${LB_IMAGE_TYPE}" in
 	netboot)
-		DESTDIR="tftpboot/debian-install/${LB_ARCHITECTURES}"
-		;;
-
-	hdd*|tar)
-		DESTDIR="binary/install"
+		DESTDIR="tftpboot/debian-install/${LB_ARCHITECTURE}"
 		;;
 
 	*)
@@ -94,7 +76,7 @@ case "${LB_DEBIAN_INSTALLER}" in
 		DI_IMAGE_TYPE="netboot"
 		;;
 	*)
-		case "${LIVE_IMAGE_TYPE}" in
+		case "${LB_IMAGE_TYPE}" in
 			netboot)
 				DI_IMAGE_TYPE="netboot"
 				;;
@@ -107,7 +89,7 @@ case "${LB_DEBIAN_INSTALLER}" in
 esac
 
 # Set architecture-specific variables
-case "${LB_ARCHITECTURES}" in
+case "${LB_ARCHITECTURE}" in
 	armel)
 		DEFAULT_FLAVOUR="$(echo ${LB_LINUX_FLAVOURS} | awk '{ print $1 }')"
 		case "${DI_IMAGE_TYPE}" in
@@ -127,11 +109,11 @@ case "${LB_ARCHITECTURES}" in
 	powerpc)
 		case "${DI_IMAGE_TYPE}" in
 			cdrom)
-				DI_REMOTE_BASE="${LB_ARCHITECTURES}/cdrom"
+				DI_REMOTE_BASE="${LB_ARCHITECTURE}/cdrom"
 			;;
 
 			netboot)
-				DI_REMOTE_BASE="${LB_ARCHITECTURES}/netboot"
+				DI_REMOTE_BASE="${LB_ARCHITECTURE}/netboot"
 				;;
 		esac
 
@@ -142,8 +124,8 @@ case "${LB_ARCHITECTURES}" in
 	*)
 		case "${DI_IMAGE_TYPE}" in
 			netboot)
-				DI_REMOTE_BASE="netboot/debian-installer/${LB_ARCHITECTURES}"
-				DI_REMOTE_BASE_GTK="netboot/gtk/debian-installer/${LB_ARCHITECTURES}"
+				DI_REMOTE_BASE="netboot/debian-installer/${LB_ARCHITECTURE}"
+				DI_REMOTE_BASE_GTK="netboot/gtk/debian-installer/${LB_ARCHITECTURE}"
 				DI_REMOTE_KERNEL="linux"
 				;;
 
@@ -156,11 +138,10 @@ case "${LB_ARCHITECTURES}" in
 		;;
 esac
 
-Check_multiarchitectures
-
 Install_file() {
-	local FILE
-	FILE="${1}"
+	local FILE="${1}"
+
+	Echo_debug "Installing file %s" "${FILE}"
 
 	local ARCHIVE_AREA
 	ARCHIVE_AREA="$(dpkg -I ${FILE} | awk '/^.*Section: / { print $2 }')"
@@ -172,9 +153,9 @@ Install_file() {
 		ARCHIVE_AREA="main"
 	fi
 
-	local TARGET
-	TARGET="${2}/${ARCHIVE_AREA}"
+	local TARGET="${2}/${ARCHIVE_AREA}"
 
+	local SOURCE
 	SOURCE="$(dpkg -f ${FILE} Source | awk '{ print $1 }')"
 
 	if [ -z "${SOURCE}" ]
@@ -182,6 +163,7 @@ Install_file() {
 		SOURCE="$(basename ${FILE} | awk -F_ '{ print $1 }')"
 	fi
 
+	local LETTER
 	case "${SOURCE}" in
 		lib?*)
 			LETTER="$(echo ${SOURCE} | sed 's|\(....\).*|\1|')"
@@ -196,7 +178,7 @@ Install_file() {
 	mkdir -p "${TARGET}"/"${LETTER}"/"${SOURCE}"
 
 	# Move files
-	cp "${FILE}" "${TARGET}"/"${LETTER}"/"${SOURCE}"
+	cp -a "${FILE}" "${TARGET}"/"${LETTER}"/"${SOURCE}"
 }
 
 # Set absolute directory for caching; we require it when we call Download_file
@@ -204,16 +186,17 @@ Install_file() {
 _LB_CACHE_DIR="$(pwd)/cache/installer_debian-installer"
 
 Download_file () {
-	local _LB_TARGET
-	_LB_TARGET="${1}"
+	local _LB_TARGET="${1}"
+	local _LB_URL="${2}"
 
-	local _LB_URL
-	_LB_URL="${2}"
+	Echo_debug "Downloading file \`%s\` from \`%s\`" "${_LB_TARGET}" "${_LB_URL}"
 
+	local _LB_CACHE_FILE
 	_LB_CACHE_FILE="${_LB_CACHE_DIR}/$(echo "${_LB_URL}" | sed 's|/|_|g')"
 
 	if [ ! -f "${_LB_CACHE_FILE}" ]
 	then
+		Echo_debug "Not cached, downloading fresh..."
 		mkdir -p ${_LB_CACHE_DIR}
 		if ! wget ${WGET_OPTIONS} -O "${_LB_CACHE_FILE}" "${_LB_URL}"
 		then
@@ -222,14 +205,17 @@ Download_file () {
 			Echo_error "Could not download file: %s" "${_LB_URL}"
 			exit 1
 		fi
+	else
+		Echo_debug "Using copy from cache..."
 	fi
 
+	# Use hardlink if same device
 	if [ "$(stat --printf %d "${_LB_CACHE_DIR}/")" = "$(stat --printf %d ./)" ]
 	then
 		CP_OPTIONS="-l"
 	fi
 
-	cp -f ${CP_OPTIONS} -- "${_LB_CACHE_FILE}" "${_LB_TARGET}"
+	cp -a -f ${CP_OPTIONS} -- "${_LB_CACHE_FILE}" "${_LB_TARGET}"
 }
 
 VMLINUZ_DI="vmlinuz"
@@ -240,38 +226,31 @@ VMLINUZ_GI="gtk/vmlinuz"
 INITRD_GI="gtk/initrd.gz"
 DESTDIR_GI="${DESTDIR}/gtk"
 
+# Debian Installer daily builds
+DAILY_DI_URL="https://d-i.debian.org/daily-images/${LB_ARCHITECTURE}/daily"
+
 case "${LB_DERIVATIVE}" in
-	false)
+	true)
 		if [ "${LB_DEBIAN_INSTALLER_DISTRIBUTION}" = "daily" ]
 		then
-			# FIXME: variable name should be decupled from derivatves
-			LB_PARENT_DEBIAN_INSTALLER_DISTRIBUTION="sid"
+			# FIXME: variable name should be decoupled from derivatives
+			LB_DEBIAN_INSTALLER_DISTRIBUTION="sid"
 
-			# Debian Installer daily builds
-			URL="https://d-i.debian.org/daily-images/${LB_ARCHITECTURES}/daily/"
+			URL="${DAILY_DI_URL}"
 		else
-			URL="${LB_MIRROR_DEBIAN_INSTALLER}/dists/${LB_DEBIAN_INSTALLER_DISTRIBUTION}/main/installer-${LB_ARCHITECTURES}/current/images/"
+			URL="${LB_MIRROR_DEBIAN_INSTALLER}/dists/${LB_DEBIAN_INSTALLER_DISTRIBUTION}/main/installer-${LB_ARCHITECTURE}/current/images"
 		fi
 		;;
 
-	true)
+	false)
 		if [ "${LB_PARENT_DEBIAN_INSTALLER_DISTRIBUTION}" = "daily" ]
 		then
 			LB_PARENT_DEBIAN_INSTALLER_DISTRIBUTION="sid"
 
-			# Debian Installer daily builds
-			URL="https://d-i.debian.org/daily-images/${LB_ARCHITECTURES}/daily/"
+			URL="${DAILY_DI_URL}"
 		else
-			URL="${LB_PARENT_MIRROR_DEBIAN_INSTALLER}/dists/${LB_PARENT_DEBIAN_INSTALLER_DISTRIBUTION}/main/installer-${LB_ARCHITECTURES}/current/images/"
+			URL="${LB_PARENT_MIRROR_DEBIAN_INSTALLER}/dists/${LB_PARENT_DEBIAN_INSTALLER_DISTRIBUTION}/main/installer-${LB_ARCHITECTURE}/current/images"
 		fi
-
-		if [ "${LB_MODE}" = "progress-linux" ]
-		then
-			# FIXME: normal derivatives probably don't rebuild d-i,
-			# but progress-linux does.
-			URL="${LB_MIRROR_DEBIAN_INSTALLER}/dists/${LB_DEBIAN_INSTALLER_DISTRIBUTION}/main/installer-${LB_ARCHITECTURES}/current/images/"
-		fi
-		;;
 esac
 
 mkdir -p "${DESTDIR_DI}"
@@ -281,25 +260,24 @@ Download_file "${DESTDIR}"/"${VMLINUZ_DI}" ${URL}/${DI_REMOTE_BASE}/${DI_REMOTE_
 Download_file "${DESTDIR}"/"${INITRD_DI}" ${URL}/${DI_REMOTE_BASE}/initrd.gz
 
 # Downloading graphical-installer
-DOWNLOAD_GTK_INSTALLER=0
+DOWNLOAD_GTK_INSTALLER=false
 if [ "${LB_DEBIAN_INSTALLER_GUI}" = "true" ]
 then
-		case "${LB_ARCHITECTURES}" in
+	case "${LB_ARCHITECTURE}" in
 		amd64|i386)
-			DOWNLOAD_GTK_INSTALLER=1
+			DOWNLOAD_GTK_INSTALLER=true
 			;;
 
 		powerpc)
 			if [ "${LB_DEBIAN_INSTALLER}" = "netboot" ]
 			then
-				DOWNLOAD_GTK_INSTALLER=1
+				DOWNLOAD_GTK_INSTALLER=true
 			fi
 			;;
 	esac
 fi
 
-if [ ${DOWNLOAD_GTK_INSTALLER} -eq 1 ]
-then
+if $DOWNLOAD_GTK_INSTALLER; then
 	mkdir -p "${DESTDIR_GI}"
 	Download_file "${DESTDIR}"/"${VMLINUZ_GI}" ${URL}/${DI_REMOTE_BASE_GTK}/${DI_REMOTE_KERNEL}
 	Download_file "${DESTDIR}"/"${INITRD_GI}" ${URL}/${DI_REMOTE_BASE_GTK}/initrd.gz
@@ -311,20 +289,20 @@ then
 	# Downloading additional packages
 	mkdir -p chroot/binary.deb/archives/partial
 
-	case "${LB_ARCHITECTURES}" in
+	case "${LB_ARCHITECTURE}" in
 		amd64)
-			DI_REQ_PACKAGES="lilo grub-pc"
-			DI_PACKAGES="${DI_REQ_PACKAGES} linux-image-amd64"
+			DI_REQ_PACKAGES="grub-pc"
+			DI_PACKAGES="linux-image-amd64"
 			;;
 
 		i386)
-			DI_REQ_PACKAGES="lilo grub-pc"
-			DI_PACKAGES="${DI_REQ_PACKAGES} linux-image-686-pae"
+			DI_REQ_PACKAGES="grub-pc"
+			DI_PACKAGES="linux-image-686-pae"
 			;;
 
 		powerpc)
 			DI_REQ_PACKAGES="yaboot"
-			DI_PACKAGES="${DI_REQ_PACKAGES} linux-image-powerpc linux-image-powerpc64 linux-image-powerpc-smp"
+			DI_PACKAGES="linux-image-powerpc linux-image-powerpc64 linux-image-powerpc-smp"
 			;;
 	esac
 
@@ -333,61 +311,48 @@ then
 	case "${LB_MODE}" in
 		debian)
 			DI_REQ_PACKAGES="${DI_REQ_PACKAGES} console-setup keyboard-configuration kbd"
-			DI_PACKAGES="${DI_PACKAGES} console-setup keyboard-configuration kbd"
 			;;
 	esac
+
+	Echo_debug "DI_REQ_PACKAGES: %s" "${DI_REQ_PACKAGES}"
+	Echo_debug "DI_PACKAGES: %s" "${DI_PACKAGES}"
+
 	# Include firmware packages
 	if [ "${LB_FIRMWARE_BINARY}" = "true" ]
 	then
-		# Assumption: firmware packages install files into /lib/firmware
-
 		# Get all firmware packages names
 		mkdir -p cache/contents.binary
 
 		FIRMWARE_PACKAGES=""
 
-		_CONTENTS="$(for _PARENT_ARCHIVE_AREA in ${LB_PARENT_ARCHIVE_AREAS}; do echo ${LB_PARENT_MIRROR_CHROOT}/dists/${LB_PARENT_DISTRIBUTION_CHROOT}/${_PARENT_ARCHIVE_AREA}/Contents-${LB_ARCHITECTURES}.gz; done)"
-
-		rm -f cache/contents.chroot/contents.${LB_PARENT_DISTRIBUTION_CHROOT}.${LB_ARCHITECTURES}
-
-		for _CONTENT in ${_CONTENTS}
-		do
-			wget ${WGET_OPTIONS} ${_CONTENT} -O - | gunzip -c >> cache/contents.chroot/contents.${LB_PARENT_DISTRIBUTION_CHROOT}.${LB_ARCHITECTURES}
-
-			FIRMWARE_PACKAGES="${FIRMWARE_PACKAGES} $(awk '/^lib\/firmware/ { print $2 }' cache/contents.chroot/contents.${LB_PARENT_DISTRIBUTION_CHROOT}.${LB_ARCHITECTURES} | sort -u)"
-		done
-
-		if echo ${LB_PARENT_ARCHIVE_AREAS} | grep -qs "non-free"
-		then
-			# Manually add firmware-linux/non-free meta package
-			if [ "${LB_DERIVATIVE}" != "true" ]
-			then
-				FIRMWARE_PACKAGES="${FIRMWARE_PACKAGES} firmware-linux"
-			else
-				case "${LB_DERIVATIVE_IS_BASED_ON}" in
-					debian)
-						FIRMWARE_PACKAGES="${FIRMWARE_PACKAGES} firmware-linux"
-						;;
-					*)
-						;;
-				esac
-			fi
+		# Manually add firmware-linux/non-free meta package
+		if [ "${LB_DERIVATIVE}" = "false" ] && In_list "non-free" ${LB_PARENT_ARCHIVE_AREAS}; then
+			FIRMWARE_PACKAGES="${FIRMWARE_PACKAGES} firmware-linux"
 		fi
+
+		Firmware_List_From_Contents "${LB_PARENT_MIRROR_CHROOT}" "${LB_PARENT_DISTRIBUTION_CHROOT}" "${LB_PARENT_ARCHIVE_AREAS}"
 
 		if [ "${LB_DERIVATIVE}" = "true" ]
 		then
-			# FIXME: account for the fact that PARENT_DISTRIBUTION and DISTRIBUTION might be the same (to not have overlapping cache files for contents).
+			# Avoid downloading things twice if distributions are identical
+			DERIVATIVE_ARCHIVE_AREAS=""
+			if [ "${LB_DISTRIBUTION_CHROOT}" != "${LB_PARENT_DISTRIBUTION_CHROOT}" ]
+			then
+				DERIVATIVE_ARCHIVE_AREAS="${LB_ARCHIVE_AREAS}"
+			else
+				for _ARCHIVE_AREA in ${LB_ARCHIVE_AREAS}
+				do
+					if ! In_list ${_ARCHIVE_AREA} ${LB_PARENT_ARCHIVE_AREAS}
+					then
+						DERIVATIVE_ARCHIVE_AREAS="${DERIVATIVE_ARCHIVE_AREAS} ${DERIVATIVE_ARCHIVE_AREAS}"
+					fi
+				done
+			fi
 
-			_CONTENTS="$(for _ARCHIVE_AREA in ${LB_ARCHIVE_AREAS}; do echo ${LB_MIRROR_CHROOT}/dists/${LB_DISTRIBUTION_CHROOT}/${_ARCHIVE_AREA}/Contents-${LB_ARCHITECTURES}.gz; done)"
-
-			rm -f cache/contents.chroot/contents.${LB_DISTRIBUTION_CHROOT}.${LB_ARCHITECTURES}
-
-			for _CONTENT in ${_CONTENTS}
-			do
-				wget ${WGET_OPTIONS} ${_CONTENT} -O - | gunzip -c >> cache/contents.chroot/contents.${LB_DISTRIBUTION_CHROOT}.${LB_ARCHITECTURES}
-
-				FIRMWARE_PACKAGES="${FIRMWARE_PACKAGES} $(awk '/^lib\/firmware/ { print $2 }' cache/contents.chroot/contents.${LB_DISTRIBUTION_CHROOT}.${LB_ARCHITECTURES} | sort -u)"
-			done
+			if [ ! -z "${DERIVATIVE_ARCHIVE_AREAS}" ]
+			then
+				Firmware_List_From_Contents "${LB_MIRROR_CHROOT}" "${LB_DISTRIBUTION_CHROOT}" "${DERIVATIVE_ARCHIVE_AREAS}"
+			fi
 		fi
 
 		# Drop section and keep package names only
@@ -395,10 +360,13 @@ then
 		do
 			DI_FIRMWARE_PACKAGES="${DI_FIRMWARE_PACKAGES} $(echo ${_PACKAGE} | awk -F/ '{ print $NF }')"
 		done
+		FIRMWARE_PACKAGES=""
 	fi
 
+	Echo_debug "DI_FIRMWARE_PACKAGES: %s" "${DI_FIRMWARE_PACKAGES}"
+
 	# Set apt command prefix
-	_LB_APT_COMMAND="apt-get ${APT_OPTIONS} -o Dir::Cache=/binary.deb -o Dir::State::status=/dev/null -o APT::Install-Recommends=false --download-only"
+	_LB_APT_COMMAND="apt-get ${APT_OPTIONS} -o Dir::Cache=/binary.deb -o Dir::State::status=/dev/null -o APT::Install-Recommends=false -o Debug::NoLocking=true --download-only"
 
 	if [ "${LB_DEBIAN_INSTALLER}" = "live" ]
 	then
@@ -412,26 +380,27 @@ then
 		# Download .debs of the required packages
 		Chroot chroot ${_LB_APT_COMMAND} install ${DI_PACKAGES} ${DI_FIRMWARE_PACKAGES} ${DI_REQ_PACKAGES}
 
-		# Drop the packages already installed that d-i doesn't explicitely need
+		# Drop the packages already installed that d-i doesn't explicitly need
 		_REMAINING_PACKAGES="$(echo ${DI_FIRMWARE_PACKAGES} ${DI_REQ_PACKAGES} | sed -e 's# #|#g')"
 		_REMAINING_PACKAGES="$(Chroot_package_list chroot | grep -E -v "^(${_REMAINING_PACKAGES})\$")"
 
+		Echo_debug "'live' installer mode, dropping following unneeded debs: %s" "${_REMAINING_PACKAGES}"
 		for _PACKAGE in ${_REMAINING_PACKAGES}
 		do
 			rm -f chroot/binary.deb/archives/${_PACKAGE}_*.deb
 		done
 	else
 		# Download .debs of the required packages
-		Chroot chroot ${_LB_APT_COMMAND} install ${DI_PACKAGES} ${DI_FIRMWARE_PACKAGES}
+		Chroot chroot ${_LB_APT_COMMAND} install ${DI_PACKAGES} ${DI_FIRMWARE_PACKAGES} ${DI_REQ_PACKAGES}
 	fi
 
 	mv chroot/binary.deb ./
 
-	for _ARCHIVE_AREA in $(echo ${LB_PARENT_ARCHIVE_AREAS} ${LB_ARCHIVE_AREAS})
-	do
+	for _ARCHIVE_AREA in ${LB_PARENT_ARCHIVE_AREAS} ${LB_ARCHIVE_AREAS}; do
 		mkdir -p binary/pool/${_ARCHIVE_AREA}
 	done
 
+	Echo_debug "Installing binary debs"
 	if Find_files binary.deb/archives/*.deb
 	then
 		for FILE in binary.deb/archives/*.deb
@@ -445,6 +414,7 @@ then
 		# Including base debian packages
 		if ls cache/packages.bootstrap/*.deb > /dev/null 2>&1
 		then
+			Echo_debug "Installing bootstrap debs"
 			for FILE in cache/packages.bootstrap/*.deb
 			do
 				Install_file "${FILE}" "binary/pool"
@@ -456,10 +426,12 @@ then
 		fi
 	fi
 
+	Echo_debug "Including local debs"
+
 	# Including local debs
-	if Find_files config/packages.binary/*_"${LB_ARCHITECTURES}".deb || Find_files config/packages/*_"${LB_ARCHITECTURES}".deb
+	if Find_files config/packages.binary/*_"${LB_ARCHITECTURE}".deb || Find_files config/packages/*_"${LB_ARCHITECTURE}".deb
 	then
-		for FILE in config/packages.binary/*_"${LB_ARCHITECTURES}".deb config/packages/*_"${LB_ARCHITECTURES}".deb
+		for FILE in config/packages.binary/*_"${LB_ARCHITECTURE}".deb config/packages/*_"${LB_ARCHITECTURE}".deb
 		do
 			if [ -e "${FILE}" ]
 			then
@@ -480,23 +452,30 @@ then
 	fi
 
 	# Generating deb indices
-	for _ARCHIVE_AREA in $(cd binary/pool && ls)
-	do
-		mkdir -p binary/dists/${LB_PARENT_DEBIAN_INSTALLER_DISTRIBUTION}/${_ARCHIVE_AREA}/binary-${LB_ARCHITECTURES}
+	Echo_debug "Generating deb indices"
+	for _ARCHIVE_AREA in $(cd binary/pool && ls); do
+		INDICE_DIR="dists/${LB_PARENT_DEBIAN_INSTALLER_DISTRIBUTION}/${_ARCHIVE_AREA}/binary-${LB_ARCHITECTURE}"
+		mkdir -p "binary/${INDICE_DIR}"
 
 		mv binary chroot/root
-		echo "cd /root/binary && apt-ftparchive packages pool/${_ARCHIVE_AREA} > dists/${LB_PARENT_DEBIAN_INSTALLER_DISTRIBUTION}/${_ARCHIVE_AREA}/binary-${LB_ARCHITECTURES}/Packages" > chroot/binary.sh
+cat > chroot/binary.sh << EOF
+#!/bin/sh
+cd /root/binary
+apt-ftparchive packages "pool/${_ARCHIVE_AREA}" > "${INDICE_DIR}/Packages"
+EOF
 		Chroot chroot "sh binary.sh"
 		rm -f chroot/binary.sh
 		mv chroot/root/binary ./
 
-		gzip -9 -c binary/dists/${LB_PARENT_DEBIAN_INSTALLER_DISTRIBUTION}/${_ARCHIVE_AREA}/binary-${LB_ARCHITECTURES}/Packages > binary/dists/${LB_PARENT_DEBIAN_INSTALLER_DISTRIBUTION}/${_ARCHIVE_AREA}/binary-${LB_ARCHITECTURES}/Packages.gz
+		touch "binary/${INDICE_DIR}/Packages" -d@${SOURCE_DATE_EPOCH}
+		gzip -9 -c "binary/${INDICE_DIR}/Packages" > "binary/${INDICE_DIR}/Packages.gz"
 
 		# Fetching release
-		Download_file binary/dists/${LB_PARENT_DEBIAN_INSTALLER_DISTRIBUTION}/${_ARCHIVE_AREA}/binary-${LB_ARCHITECTURES}/Release "${LB_PARENT_MIRROR_CHROOT}"/dists/"${LB_PARENT_DEBIAN_INSTALLER_DISTRIBUTION}"/${_ARCHIVE_AREA}/binary-"${LB_ARCHITECTURES}"/Release
+		Download_file "binary/${INDICE_DIR}/Release" "${LB_PARENT_MIRROR_CHROOT}/${INDICE_DIR}/Release"
 	done
 
 	# Symlink firmware packages to /firmware
+	Echo_debug "Symlinking firmware packages"
 	if [ -n "${DI_FIRMWARE_PACKAGES}" ]
 	then
 		mkdir -p binary/firmware
@@ -518,55 +497,96 @@ then
 	cd binary.udeb
 
 	# Downloading udeb indices
-	Download_file Packages.gz "${LB_PARENT_MIRROR_CHROOT}"/dists/"${LB_PARENT_DEBIAN_INSTALLER_DISTRIBUTION}"/main/debian-installer/binary-"${LB_ARCHITECTURES}"/Packages.gz
+	Echo_debug "Downloading udeb indices"
+	Download_file Packages.gz "${LB_PARENT_MIRROR_CHROOT}"/dists/"${LB_PARENT_DEBIAN_INSTALLER_DISTRIBUTION}"/main/debian-installer/binary-"${LB_ARCHITECTURE}"/Packages.gz
 	gunzip -c Packages.gz > Packages
 
 	if [ "${LB_DERIVATIVE}" = "true" ]
 	then
-		Download_file Packages.derivative.gz "${LB_MIRROR_CHROOT}"/dists/"${LB_DEBIAN_INSTALLER_DISTRIBUTION}"/main/debian-installer/binary-"${LB_ARCHITECTURES}"/Packages.gz
+		Download_file Packages.derivative.gz "${LB_MIRROR_CHROOT}"/dists/"${LB_DEBIAN_INSTALLER_DISTRIBUTION}"/main/debian-installer/binary-"${LB_ARCHITECTURE}"/Packages.gz
 		gunzip -c Packages.derivative.gz > Packages.derivative
 	fi
 
-	# Sorting udebs
-	if [ "${LB_DERIVATIVE}" = true ]
-	then
-		UDEBS="$(awk '/Filename: / { print $2 }' Packages.derivative)"
-	fi
+	Echo_debug "Extracting udeb package list"
 
-	UDEBS="${UDEBS} $(awk '/Filename: / { print $2 }' Packages)"
-
-	# Downloading udebs packages
-	Echo_message "Downloading udebs..."
+	UDEBS="$(awk '/Filename: / { print $2 }' Packages)"
+	UDEBS_DERIVED=""
 
 	if [ "${LB_DERIVATIVE}" = "true" ]
 	then
-		Echo_message "Building in derivative mode in debian+ layout.. a lot of 404 errors are ok here."
+		UDEBS_DERIVED="$(awk '/Filename: / { print $2 }' Packages.derivative)"
+
+		Echo_debug "Derivative mode, filtering replaced packages from parent list"
+		Echo_debug "Parent (orig): %s" "${UDEBS}"
+		Echo_debug "Derived: %s" "${UDEBS_DERIVED}"
+		# Filter parent packages to exclude those replaced by derivative
+		# We need to compare package names from lists of paths and filenames that include versions
+		_UDEBS_FILTERED=""
+		_UDEBS_DERIVED_NAMES=""
+		for _UDEB in ${UDEBS_DERIVED}
+		do
+			_UDEBS_DERIVED_NAMES="${_UDEBS_DERIVED_NAMES} $(basename ${_UDEB} | awk -F_ '{ print $1 }')"
+		done
+		for _UDEB in ${UDEBS}
+		do
+			if ! In_list "$(basename ${_UDEB} | awk -F_ '{ print $1 }')" ${_UDEBS_DERIVED_NAMES}
+			then
+				_UDEBS_FILTERED="${_UDEBS_FILTERED} ${_UDEB}"
+			fi
+		done
+		UDEBS="${_UDEBS_FILTERED}"
+		_UDEBS_FILTERED=""
+		_UDEBS_DERIVED_NAMES=""
+		Echo_debug "Parent (filtered): %s" "${UDEBS}"
 	fi
+
+	# Downloading udeb packages
+	Echo_message "Downloading udebs..."
+
+	UDEB_CACHE_DIR="../cache/packages.installer_debian-installer.udeb"
 
 	for UDEB in ${UDEBS}
 	do
-		if [ -f ../cache/packages.installer_debian-installer.udeb/"$(basename ${UDEB})" ]
-		then
-			# Copying cached udebs
-			cp ../cache/packages.installer_debian-installer.udeb/"$(basename ${UDEB})" ./
+		_UDEB_FILENAME="$(basename ${UDEB})"
+		# Copy from cache if available, otherwise download
+		if [ -f "${UDEB_CACHE_DIR}/${_UDEB_FILENAME}" ]; then
+			Echo_debug "Copying %s from cache" "${UDEB}"
+			cp -a "${UDEB_CACHE_DIR}/${_UDEB_FILENAME}" ./
 		else
-			# Downloading udebs
-			if ! ls "$(basename ${UDEB} | awk -F_ '{ print $1 }')"_* > /dev/null 2>&1
-			then
-				wget ${WGET_OPTIONS} "${LB_MIRROR_CHROOT}"/${UDEB} || wget ${WGET_OPTIONS} "${LB_PARENT_MIRROR_CHROOT}"/${UDEB}
-			fi
+			Echo_debug "Downloading %s" "${UDEB}"
+			wget ${WGET_OPTIONS} "${LB_PARENT_MIRROR_CHROOT}/${UDEB}"
 		fi
 	done
 
+	if [ "${LB_DERIVATIVE}" = "true" ]
+	then
+		Echo_debug "Moving on to derivative set"
+		for UDEB in ${UDEBS_DERIVED}
+		do
+			_UDEB_FILENAME="$(basename ${UDEB})"
+			# Copy from cache if available, otherwise download
+			if [ -f "${UDEB_CACHE_DIR}/${_UDEB_FILENAME}" ]; then
+				Echo_debug "Copying %s from cache" "${UDEB}"
+				cp -a "${UDEB_CACHE_DIR}/${_UDEB_FILENAME}" ./
+			else
+				Echo_debug "Downloading %s" "${UDEB}"
+				wget ${WGET_OPTIONS} "${LB_MIRROR_CHROOT}/${UDEB}"
+			fi
+		done
+	fi
+
 	# Caching udebs
-	rm -rf ../cache/packages.installer_debian-installer.udeb
-	mkdir -p ../cache/packages.installer_debian-installer.udeb
-	cp *.udeb ../cache/packages.installer_debian-installer.udeb
+	Echo_debug "Refreshing udeb cache"
+	rm -rf "${UDEB_CACHE_DIR}"
+	mkdir -p "${UDEB_CACHE_DIR}"
+	cp -a *.udeb "${UDEB_CACHE_DIR}"
+
+	Echo_debug "Including local udebs"
 
 	# Including local udebs
-	if Find_files ../config/packages.binary/*_"${LB_ARCHITECTURES}".udeb || Find_files ../config/packages/*_"${LB_ARCHITECTURES}".udeb
+	if Find_files ../config/packages.binary/*_"${LB_ARCHITECTURE}".udeb || Find_files ../config/packages/*_"${LB_ARCHITECTURE}".udeb
 	then
-		for FILE in ../config/packages.binary/*_"${LB_ARCHITECTURES}".udeb ../config/packages/*_"${LB_ARCHITECTURES}".udeb
+		for FILE in ../config/packages.binary/*_"${LB_ARCHITECTURE}".udeb ../config/packages/*_"${LB_ARCHITECTURE}".udeb
 		do
 			if [ -e "${FILE}" ]
 			then
@@ -592,14 +612,16 @@ then
 		done
 	fi
 
+	Echo_debug "Generating exclude list"
+
 	# Excluding udebs
-	for LOCATION in "${LIVE_BUILD}/data/debian-cd" /usr/share/live/build/data/debian-cd
+	for LOCATION in /usr/share/live/build/data/debian-cd "${LIVE_BUILD}/data/debian-cd"
 	do
-		if [ -e "${LOCATION}" ]
+		if [ -e "${LOCATION}/${LB_PARENT_DEBIAN_INSTALLER_DISTRIBUTION}" ]
 		then
 			grep -v "^#" "${LOCATION}/${LB_PARENT_DEBIAN_INSTALLER_DISTRIBUTION}/udeb_exclude" > exclude || true
-	grep -v "^#" "${LOCATION}/${LB_PARENT_DEBIAN_INSTALLER_DISTRIBUTION}/exclude-udebs" >> exclude || true
-	grep -v "^#" "${LOCATION}/${LB_PARENT_DEBIAN_INSTALLER_DISTRIBUTION}/exclude-udebs-${LB_ARCHITECTURES}" >> exclude || true
+			grep -v "^#" "${LOCATION}/${LB_PARENT_DEBIAN_INSTALLER_DISTRIBUTION}/exclude-udebs" >> exclude || true
+			grep -v "^#" "${LOCATION}/${LB_PARENT_DEBIAN_INSTALLER_DISTRIBUTION}/exclude-udebs-${LB_ARCHITECTURE}" >> exclude || true
 
 			continue
 		fi
@@ -613,39 +635,48 @@ then
 
 	# Excluding udebs from excludes because we want them to be in the image on purpose
 	sed -i -e 's|di-utils-exit-installer||' exclude # used for live-installer-launcher
+	if [ "${LB_DEBIAN_INSTALLER}" = "live" ]; then
+		sed -i -e 's|live-installer||' exclude
+	fi
 
-	while read EXCLUDE
-	do
-		if [ "${LB_DEBIAN_INSTALLER}" = "live" ] && [ "${EXCLUDE}" = "live-installer" ]
-		then
-			continue
-		fi
-
-		rm -f ${EXCLUDE}_*.udeb
+	# Remove all udebs to be excluded from inclusion
+	Echo_debug "Removing excluded udebs"
+	while read EXCLUDE; do
+		rm -f "${EXCLUDE}_*.udeb"
 	done < exclude
 
-	# Moving udebs
-	for UDEB in ${UDEBS}
-	do
-		if [ -f "$(basename ${UDEB})" ]
-		then
-			Install_file "$(basename ${UDEB})" "pool-udeb"
-			rm "$(basename ${UDEB})"
+	# Sort udebs into alphabetised pool structure
+	Echo_debug "Organising into pool structure"
+	for UDEB in ${UDEBS} ${UDEBS_DERIVED}; do
+		_UDEB_FILENAME="$(basename ${UDEB})"
+		if [ -f "${_UDEB_FILENAME}" ]; then
+			Install_file "${_UDEB_FILENAME}" "pool-udeb"
+			rm "${_UDEB_FILENAME}"
 		fi
 	done
 
 	# Creating udeb indices
-	mkdir -p dists/"${LB_PARENT_DEBIAN_INSTALLER_DISTRIBUTION}"/main/debian-installer/binary-"${LB_ARCHITECTURES}"
+	Echo_debug "Generating udeb indices"
+
+	UDEB_INDICE_DIR="dists/${LB_PARENT_DEBIAN_INSTALLER_DISTRIBUTION}/main/debian-installer/binary-${LB_ARCHITECTURE}"
+
+	mkdir -p "${UDEB_INDICE_DIR}"
+
 	cd "${OLDPWD}"
 
 	mv binary.udeb chroot/root
-	echo "cd /root/binary.udeb && apt-ftparchive packages pool-udeb/main > dists/${LB_PARENT_DEBIAN_INSTALLER_DISTRIBUTION}/main/debian-installer/binary-${LB_ARCHITECTURES}/Packages" > chroot/binary.sh
+cat > chroot/binary.sh << EOF
+#!/bin/sh
+cd /root/binary.udeb
+apt-ftparchive packages "pool-udeb/main" > "${UDEB_INDICE_DIR}/Packages"
+EOF
 	Chroot chroot "sh binary.sh"
 	rm -f chroot/binary.sh
 	mv chroot/root/binary.udeb ./
 
 	cd binary.udeb
-	gzip -9 -c dists/${LB_PARENT_DEBIAN_INSTALLER_DISTRIBUTION}/main/debian-installer/binary-${LB_ARCHITECTURES}/Packages > dists/${LB_PARENT_DEBIAN_INSTALLER_DISTRIBUTION}/main/debian-installer/binary-${LB_ARCHITECTURES}/Packages.gz
+	touch "${UDEB_INDICE_DIR}/Packages" -d@${SOURCE_DATE_EPOCH}
+	gzip -9 -c "${UDEB_INDICE_DIR}/Packages" > "${UDEB_INDICE_DIR}/Packages.gz"
 
 	rm -f Packages* exclude
 	find . | cpio -dmpu "${OLDPWD}"/binary
@@ -655,6 +686,7 @@ then
 	rm -rf binary.deb
 
 	# Generating release file
+	Echo_debug "Generating release file"
 	mv binary chroot/root
 
 	if [ -e chroot/etc/os-release ]
@@ -677,22 +709,25 @@ then
 	esac
 
 cat > chroot/binary.sh << EOF
+#!/bin/sh
 cd /root/binary && apt-ftparchive \
 	-o APT::FTPArchive::Release::Origin="Debian" \
 	-o APT::FTPArchive::Release::Label="Debian" \
 	-o APT::FTPArchive::Release::Suite="${_SUITE}" \
 	${_LB_APT_VERSION_OPT} \
 	-o APT::FTPArchive::Release::Codename="${LB_PARENT_DISTRIBUTION_BINARY}" \
-	-o APT::FTPArchive::Release::Date="$(date -R)" \
-	-o APT::FTPArchive::Release::Architectures="${LB_ARCHITECTURES}" \
+	-o APT::FTPArchive::Release::Date="$(date -R ${DATE_UTC_OPTION} -d@${SOURCE_DATE_EPOCH})" \
+	-o APT::FTPArchive::Release::Architectures="${LB_ARCHITECTURE}" \
 	-o APT::FTPArchive::Release::Components="${LB_PARENT_ARCHIVE_AREAS}" \
-	-o APT::FTPArchive::Release::Description="Last updated: $(date -R)" \
+	-o APT::FTPArchive::Release::Description="Last updated: $(date -R ${DATE_UTC_OPTION} -d@${SOURCE_DATE_EPOCH})" \
 	release dists/${LB_PARENT_DEBIAN_INSTALLER_DISTRIBUTION} > dists/${LB_PARENT_DEBIAN_INSTALLER_DISTRIBUTION}/Release
 EOF
 
 	Chroot chroot "sh binary.sh"
 	rm -f chroot/binary.sh
 	mv chroot/root/binary ./
+
+	Echo_debug "Creating distribution directories/symlinks"
 
 	DISTRIBUTIONS="stable testing unstable"
 
@@ -701,7 +736,7 @@ EOF
 		DISTRIBUTIONS="${DISTRIBUTIONS} ${LB_PARENT_DISTRIBUTION_BINARY}"
 	fi
 
-	case "${LIVE_IMAGE_TYPE}" in
+	case "${LB_IMAGE_TYPE}" in
 		hdd)
 			case "${LB_BINARY_FILESYSTEM}" in
 				fat*|ntfs)
@@ -728,11 +763,11 @@ fi
 
 Repack_initrd()
 {
-	local TARGET_INITRD
-	local INCLUDE_PATH
-	TARGET_INITRD="${1}"
-	INCLUDE_PATH="${2}"
-	REPACK_TMPDIR="unpacked-initrd"
+	local TARGET_INITRD="${1}"
+	local INCLUDE_PATH="${2}"
+	local REPACK_TMPDIR="unpacked-initrd"
+
+	Echo_debug "Repacking initrd \`%s\`" "${TARGET_INITRD}"
 
 	if [ -d "${INCLUDE_PATH}" ]
 	then
@@ -747,6 +782,7 @@ Repack_initrd()
 	if [ ! -d "${INCLUDE_PATH}" ]
 	then
 		# Invoked the old way, just copy the preseeds
+		local _FILE
 		for _FILE in ../config/preseed/*.cfg ../config/preseed/*.cfg.installer
 		do
 			if [ -e "${_FILE}" ]
@@ -756,7 +792,7 @@ Repack_initrd()
 		done
 	else
 		# New way, include target directory content in the initrd
-		REPACK_TMPDIR_ABS="${PWD}"
+		local REPACK_TMPDIR_ABS="${PWD}"
 		cd "${INCLUDE_PATH}"
 		find -print0 | cpio -pumd0 --no-preserve-owner "${REPACK_TMPDIR_ABS}/"
 		cd "${OLDPWD}"
@@ -766,6 +802,8 @@ Repack_initrd()
 	cd ..
 	rm -rf ${REPACK_TMPDIR}
 }
+
+Echo_debug "Repacking initrds where necessary"
 
 # Preseed d-i by repacking the initrd in certain situations
 if [ "${DI_IMAGE_TYPE}" = "netboot" ] && ( ls config/preseed/*.cfg > /dev/null 2>&1 || ls config/preseed/*.cfg.installer > /dev/null 2>&1 )
@@ -789,27 +827,11 @@ then
 	fi
 fi
 
-case "${LB_MODE}" in
-	progress-linux)
-		mv binary/install binary/installer
-
-		rm -f binary/debian
-
-		for _DIRECTORY in dists pool project firmware
-		do
-			if [ -e "binary/${_DIRECTORY}" ]
-			then
-				mv binary/"${_DIRECTORY}" binary/installer
-			fi
-		done
-		;;
-esac
-
 # Saving cache
-Save_cache cache/packages.binary
+Save_package_cache binary
 
 # Removing depends
-Remove_package
+Remove_packages
 
 # Creating stage file
-Create_stagefile .build/installer_debian-installer
+Create_stagefile

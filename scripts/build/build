@@ -1,6 +1,7 @@
 #!/bin/sh
 
 ## live-build(7) - System Build Scripts
+## Copyright (C) 2016-2020 The Debian Live team
 ## Copyright (C) 2006-2015 Daniel Baumann <mail@daniel-baumann.ch>
 ##
 ## This program comes with ABSOLUTELY NO WARRANTY; for details see COPYING.
@@ -13,72 +14,60 @@ set -e
 # Including common functions
 [ -e "${LIVE_BUILD}/scripts/build.sh" ] && . "${LIVE_BUILD}/scripts/build.sh" || . /usr/lib/live/build.sh
 
-# Automatically populating config tree
-if [ -x auto/config ] && [ ! -e .build/config ]
-then
-	Echo_message "Automatically populating config tree."
-	lb config
-fi
+# Automatically building config
+Auto_build_config
 
-# Read meta config
-if [ "${1}" != "noauto" ] && [ -x auto/build ]
-then
-	Echo_message "Executing auto/build script."
-	./auto/build "${@}"
-	exit ${?}
-fi
-
-if [ "${1}" = "noauto" ]
-then
+# Redirecting to auto script if required
+if [ "${1}" = "noauto" ]; then
 	shift
+else
+	Maybe_auto_redirect build "${@}"
 fi
 
 # Setting static variables
-DESCRIPTION="$(Echo 'build a Debian Live system')"
-HELP=""
+DESCRIPTION="Build a Debian Live system"
 USAGE="${PROGRAM} [--force]"
 
-Arguments "${@}"
+# Checking build directory suitability
 
-if [ ! -d config ]
-then
+if [ ! -d config ]; then
 	Echo_warning "No config/ directory; using defaults for all options"
 	lb config
 fi
 
-if [ "$(pwd)" = "/" ]
-then
+if [ "$(pwd)" = "/" ]; then
 	Echo_error "Cannot build live image from the root directory (/)"
 	exit 1
 fi
 
-if echo $(pwd) | grep -qs " "
-then
+if echo $(pwd) | grep -qs " "; then
 	Echo_error "Cannot build live image from a directory containing spaces"
 	exit 1
 fi
 
-# Reading configuration files
-Read_conffiles config/all config/common config/bootstrap config/chroot config/binary config/source
-Set_defaults
-
-# Checking defaults
-Check_defaults
+# Processing arguments and configuration files
+Init_config_data "${@}"
 
 Echo_message "live-build ${LIVE_BUILD_VERSION}"
-Echo_message "Building config tree for a ${LB_MODE}/${LB_DISTRIBUTION_BINARY}/${LB_ARCHITECTURES} system"
+Echo_message "Building for a ${LB_MODE}/${LB_DISTRIBUTION_BINARY}/${LB_ARCHITECTURE} system"
 
-# Bootstrapping system
-lb bootstrap ${@}
+# Stage #1: Bootstrap new root filesystem
+lb bootstrap "${@}"
 
-# Customizing chroot
-lb chroot ${@}
+# Stage #2: Build live OS file system
+lb chroot "${@}"
 
-# Building installer images
-lb installer ${@}
+# Stage #3: Build installer components
+lb installer "${@}"
 
-# Building binary images
-lb binary ${@}
+# Stage #4: Build binary (live disc) images
+lb binary "${@}"
 
-# Building source images
-lb source ${@}
+# Stage #5: Build supplimentary source disc images
+lb source "${@}"
+
+if [ "${_COLOR_OUT}" = "false" ]; then
+	Echo_message "Build completed successfully"
+else
+	Echo_message "%sBuild completed successfully%s" "$(echo ${GREEN})" "$(echo ${NO_COLOR})"
+fi

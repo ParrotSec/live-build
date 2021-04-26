@@ -1,6 +1,7 @@
 #!/bin/sh
 
 ## live-build(7) - System Build Scripts
+## Copyright (C) 2016-2020 The Debian Live team
 ## Copyright (C) 2006-2015 Daniel Baumann <mail@daniel-baumann.ch>
 ##
 ## This program comes with ABSOLUTELY NO WARRANTY; for details see COPYING.
@@ -14,21 +15,15 @@ set -e
 [ -e "${LIVE_BUILD}/scripts/build.sh" ] && . "${LIVE_BUILD}/scripts/build.sh" || . /usr/lib/live/build.sh
 
 # Setting static variables
-DESCRIPTION="$(Echo 'bootstrap a Debian system with debootstrap(8)')"
-HELP=""
+DESCRIPTION="Bootstrap a Debian system with debootstrap(8)"
 USAGE="${PROGRAM} [--force]"
 
-Arguments "${@}"
+# Processing arguments and configuration files
+Init_config_data "${@}"
 
-# Reading configuration files
-Read_conffiles config/all config/common config/bootstrap config/chroot config/binary config/source
-Set_defaults
-
-if [ ! -x "$(which debootstrap 2>/dev/null)" ]
+if ! command -v debootstrap >/dev/null
 then
-	echo "E: debootstrap - command not found"
-	echo "I: debootstrap can be obtained from http://ftp.debian.org/debian/pool/main/d/debootstrap/"
-	echo "I: On Debian based systems, debootstrap can be installed with 'apt-get install debootstrap'."
+	Echo_error "debootstrap - command not found"
 	exit 1
 fi
 
@@ -37,25 +32,28 @@ Check_crossarchitectures
 
 Echo_message "Begin bootstrapping system..."
 
-Check_package chroot bin/debootstrap debootstrap
+Check_package host /usr/sbin/debootstrap debootstrap
 
 # Checking stage file
-Check_stagefile .build/bootstrap
-Check_stagefile .build/bootstrap_cache.restore
+Check_stagefile "bootstrap"
+# Note, this must match that used in `bootstrap_cache`
+Check_stagefile "bootstrap_cache.restore"
 
-# Checking lock file
-Check_lockfile .lock
+# Acquire lock file
+Acquire_lockfile
 
-# Creating lock file
-Create_lockfile .lock
+Print_breakage ()
+{
+	Echo_message "If the following stage fails, the most likely cause of the problem is with your mirror configuration or a caching proxy."
+}
 
 # Creating chroot directory
 mkdir -p chroot
 
 # Setting debootstrap options
-if [ -n "${LB_ARCHITECTURES}" ]
+if [ -n "${LB_ARCHITECTURE}" ]
 then
-	DEBOOTSTRAP_OPTIONS="${DEBOOTSTRAP_OPTIONS} --arch=${LB_ARCHITECTURES}"
+	DEBOOTSTRAP_OPTIONS="${DEBOOTSTRAP_OPTIONS} --arch=${LB_ARCHITECTURE}"
 fi
 
 if [ "${LB_ARCHIVE_AREAS}" != "main" ]
@@ -71,62 +69,59 @@ then
 fi
 
 # If LB_APT_SECURE is false, do not check signatures of the Release file
-# (requires debootstrap >= 1.0.30)
-if [ "${LB_APT_SECURE}" = "false" ] && /usr/sbin/debootstrap --help  | grep -qs '\-\-no-check-gpg'
+if [ "${LB_APT_SECURE}" = "false" ]
 then
 	DEBOOTSTRAP_OPTIONS="${DEBOOTSTRAP_OPTIONS} --no-check-gpg"
-fi
-
-if [ -x "/usr/sbin/debootstrap" ]
-then
-	if [ "${LB_CACHE_PACKAGES}" = "true" ]
-	then
-		if ls cache/packages.bootstrap/*.deb > /dev/null 2>&1
-		then
-			mkdir -p chroot/var/cache/apt/archives
-			cp cache/packages.bootstrap/*.deb chroot/var/cache/apt/archives
-		fi
-
-		Echo_breakage "Running debootstrap (download-only)... "
-		debootstrap ${DEBOOTSTRAP_OPTIONS} --download-only "${LB_PARENT_DISTRIBUTION_CHROOT}" chroot "${LB_PARENT_MIRROR_BOOTSTRAP}" ${DEBOOTSTRAP_SCRIPT}
-
-		# Removing old cache
-		rm -f cache/packages.bootstrap/*.deb
-
-		# Saving new cache
-		mkdir -p cache/packages.bootstrap
-		cp chroot/var/cache/apt/archives/*.deb cache/packages.bootstrap
-	fi
-
-	Echo_breakage "Running debootstrap... "
-
-	# Run appropriate bootstrap, i.e. foreign or regular bootstrap
-	if [ "${LB_BOOTSTRAP_QEMU_ARCHITECTURES}" = "${LB_ARCHITECTURES}" ]; then
-
-		if [ -n "${LB_BOOTSTRAP_QEMU_EXCLUDE}" ]
-		then
-			DEBOOTSTRAP_OPTIONS="${DEBOOTSTRAP_OPTIONS} --exclude=$(echo ${LB_BOOTSTRAP_QEMU_EXCLUDE} | sed 's|  *|,|g')"
-		fi
-
-		Echo_message "Bootstrap will be foreign"
-		debootstrap ${DEBOOTSTRAP_OPTIONS} --foreign "${LB_PARENT_DISTRIBUTION_CHROOT}" chroot "${LB_PARENT_MIRROR_BOOTSTRAP}" ${DEBOOTSTRAP_SCRIPT}
-
-		Echo_message "Running debootstrap second stage under QEMU"
-		cp ${LB_BOOTSTRAP_QEMU_STATIC} chroot/usr/bin
-		Chroot chroot /bin/sh /debootstrap/debootstrap --second-stage ${FOREIGN_DEBOOTSTRAP_OPTIONS}
-	else
-		debootstrap ${DEBOOTSTRAP_OPTIONS} "${LB_PARENT_DISTRIBUTION_CHROOT}" chroot "${LB_PARENT_MIRROR_BOOTSTRAP}" ${DEBOOTSTRAP_SCRIPT}
-	fi
-
-	# Deconfiguring debootstrap configurations
-	rm -f chroot/etc/hosts
-
-	# Removing bootstrap cache
-	rm -f chroot/var/cache/apt/archives/*.deb
-
-	# Creating stage file
-	Create_stagefile .build/bootstrap
 else
-	Echo_error "Can't process file /usr/bin/debootstrap (FIXME)"
-	exit 1
+	DEBOOTSTRAP_OPTIONS="${DEBOOTSTRAP_OPTIONS} --force-check-gpg"
 fi
+
+if [ "${LB_CACHE_PACKAGES}" = "true" ]
+then
+	if ls cache/packages.bootstrap/*.deb > /dev/null 2>&1
+	then
+		mkdir -p chroot/var/cache/apt/archives
+		cp cache/packages.bootstrap/*.deb chroot/var/cache/apt/archives
+	fi
+
+	Print_breakage
+	Echo_message "Running debootstrap (download-only)..."
+	debootstrap ${DEBOOTSTRAP_OPTIONS} --download-only "${LB_PARENT_DISTRIBUTION_CHROOT}" chroot "${LB_PARENT_MIRROR_BOOTSTRAP}" ${DEBOOTSTRAP_SCRIPT}
+
+	# Removing old cache
+	rm -f cache/packages.bootstrap/*.deb
+
+	# Saving new cache
+	mkdir -p cache/packages.bootstrap
+	cp chroot/var/cache/apt/archives/*.deb cache/packages.bootstrap
+fi
+
+Print_breakage
+Echo_message "Running debootstrap..."
+
+# Run appropriate bootstrap, i.e. foreign or regular bootstrap
+if [ "${LB_BOOTSTRAP_QEMU_ARCHITECTURE}" = "${LB_ARCHITECTURE}" ]; then
+
+	if [ -n "${LB_BOOTSTRAP_QEMU_EXCLUDE}" ]
+	then
+		DEBOOTSTRAP_OPTIONS="${DEBOOTSTRAP_OPTIONS} --exclude=$(echo ${LB_BOOTSTRAP_QEMU_EXCLUDE} | sed 's|  *|,|g')"
+	fi
+
+	Echo_message "Bootstrap will be foreign"
+	debootstrap ${DEBOOTSTRAP_OPTIONS} --foreign "${LB_PARENT_DISTRIBUTION_CHROOT}" chroot "${LB_PARENT_MIRROR_BOOTSTRAP}" ${DEBOOTSTRAP_SCRIPT}
+
+	Echo_message "Running debootstrap second stage under QEMU"
+	cp ${LB_BOOTSTRAP_QEMU_STATIC} chroot/usr/bin
+	Chroot chroot /bin/sh /debootstrap/debootstrap --second-stage ${FOREIGN_DEBOOTSTRAP_OPTIONS}
+else
+	debootstrap ${DEBOOTSTRAP_OPTIONS} "${LB_PARENT_DISTRIBUTION_CHROOT}" chroot "${LB_PARENT_MIRROR_BOOTSTRAP}" ${DEBOOTSTRAP_SCRIPT}
+fi
+
+# Deconfiguring debootstrap configurations
+rm -f chroot/etc/hosts
+
+# Removing bootstrap cache
+rm -f chroot/var/cache/apt/archives/*.deb
+
+# Creating stage file
+Create_stagefile "bootstrap"

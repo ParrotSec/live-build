@@ -1,6 +1,7 @@
 #!/bin/sh
 
 ## live-build(7) - System Build Scripts
+## Copyright (C) 2016-2020 The Debian Live team
 ## Copyright (C) 2006-2015 Daniel Baumann <mail@daniel-baumann.ch>
 ##
 ## This program comes with ABSOLUTELY NO WARRANTY; for details see COPYING.
@@ -10,55 +11,48 @@
 
 Check_architectures ()
 {
-	ARCHITECTURES="${@}"
-	VALID="false"
+	local ARCHITECTURE
+	for ARCHITECTURE in "${@}"; do
+		if [ "${ARCHITECTURE}" = "${LB_ARCHITECTURE}" ]; then
+			return
+		fi
 
-	for ARCHITECTURE in ${ARCHITECTURES}
-	do
-		if [ "$(echo ${LB_ARCHITECTURES} | grep ${ARCHITECTURE})" ]
-		then
-			VALID="true"
-			break
+		if [ "${ARCHITECTURE}" = "${LB_BOOTSTRAP_QEMU_ARCHITECTURE}" ]; then
+			if [ ! -e "${LB_BOOTSTRAP_QEMU_STATIC}" ]; then
+				Echo_warning "skipping %s, qemu-static binary ${LB_BOOTSTRAP_QEMU_ARCHITECTURE} was not found" "${0}"
+				continue
+			fi
+
+			if [ ! -x "${LB_BOOTSTRAP_QEMU_STATIC}" ]; then
+				Echo_warning "skipping %s, qemu-static binary ${LB_BOOTSTRAP_QEMU_STATIC} is not executable" "${0}"
+				continue
+			fi
+
+			return
 		fi
 	done
 
-	if [ "${ARCHITECTURES}" = "${LB_BOOTSTRAP_QEMU_ARCHITECTURES}" ]
-	then
-		VALID="true"
-
-		if [ ! -e "${LB_BOOTSTRAP_QEMU_STATIC}" ]
-		then
-			Echo_warning "skipping %s, qemu-static binary ${LB_BOOTSTRAP_QEMU_ARCHITECTURES} was not found"
-			VALID="false"
-		fi
-
-		if [ ! -x "${LB_BOOTSTRAP_QEMU_STATIC}" ]
-		then
-			Echo_warning "skipping %s, qemu-static binary ${LB_BOOTSTRAP_QEMU_STATIC} is not executable"
-			VALID="false"
-		fi
-
-	fi
-
-	if [ "${VALID}" = "false" ]
-	then
-		Echo_warning "skipping %s, foreign architecture(s)." "${0}"
-		exit 0
-	fi
+	Echo_warning "skipping %s, foreign architecture(s)." "${0}"
+	exit 0
 }
 
 Check_crossarchitectures ()
 {
-	if [ -x /usr/bin/dpkg ]
-	then
+	local HOST
+	if command -v dpkg >/dev/null; then
 		HOST="$(dpkg --print-architecture)"
 	else
 		HOST="$(uname -m)"
 	fi
 
+	local CROSS
 	case "${HOST}" in
 		amd64|i386|x86_64)
 			CROSS="amd64 i386"
+			;;
+
+		arm64)
+			CROSS="arm64 armhf armel"
 			;;
 
 		powerpc|ppc64)
@@ -70,55 +64,18 @@ Check_crossarchitectures ()
 			;;
 	esac
 
-	if [ "${LB_ARCHITECTURES}" = "${LB_BOOTSTRAP_QEMU_ARCHITECTURES}" ]
-	then
-
-		if [ ! -e "${LB_BOOTSTRAP_QEMU_STATIC}" ]
-		then
-			Echo_warning "skipping %s, qemu-static binary ${LB_BOOTSTRAP_QEMU_ARCHITECTURES} was not found"
+	if [ "${LB_ARCHITECTURE}" = "${LB_BOOTSTRAP_QEMU_ARCHITECTURE}" ]; then
+		if [ ! -e "${LB_BOOTSTRAP_QEMU_STATIC}" ]; then
+			Echo_warning "skipping %s, qemu-static binary ${LB_BOOTSTRAP_QEMU_ARCHITECTURE} was not found" "${0}"
 			exit 0
 		fi
 
-		if [ ! -x "${LB_BOOTSTRAP_QEMU_STATIC}" ]
-		then
-			Echo_warning "skipping %s, qemu-static binary ${LB_BOOTSTRAP_QEMU_STATIC} is not executable"
+		if [ ! -x "${LB_BOOTSTRAP_QEMU_STATIC}" ]; then
+			Echo_warning "skipping %s, qemu-static binary ${LB_BOOTSTRAP_QEMU_STATIC} is not executable" "${0}"
 			exit 0
 		fi
 		return
 	fi
 
-
-	Check_architectures "${CROSS}"
-}
-
-Check_multiarchitectures ()
-{
-	if [ "$(echo ${LB_ARCHITECTURES} | wc -w)" -gt "1" ]
-	then
-		# First, only support multiarch on iso
-		case "${LIVE_IMAGE_TYPE}" in
-			iso*)
-				# Assemble multi-arch
-				case "${LB_CURRENT_ARCHITECTURE}" in
-					amd64)
-						DESTDIR="${DESTDIR}.amd"
-						DESTDIR_LIVE="${DESTDIR_LIVE}.amd"
-						DESTDIR_INSTALL="${DESTDIR_INSTALL}.amd"
-						;;
-
-					i386)
-						DESTDIR="${DESTDIR}.386"
-						DESTDIR_LIVE="${DESTDIR_LIVE}.386"
-						DESTDIR_INSTALL="${DESTDIR_INSTALL}.386"
-						;;
-
-					powerpc)
-						DESTDIR="${DESTDIR}.ppc"
-						DESTDIR_LIVE="${DESTDIR_LIVE}.ppc"
-						DESTDIR_INSTALL="${DESTDIR_INSTALL}.ppc"
-						;;
-				esac
-				;;
-		esac
-	fi
+	Check_architectures ${CROSS}
 }

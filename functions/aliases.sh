@@ -1,6 +1,7 @@
 #!/bin/sh
 
 ## live-build(7) - System Build Scripts
+## Copyright (C) 2016-2020 The Debian Live team
 ## Copyright (C) 2006-2015 Daniel Baumann <mail@daniel-baumann.ch>
 ##
 ## This program comes with ABSOLUTELY NO WARRANTY; for details see COPYING.
@@ -15,18 +16,14 @@ Find_files ()
 
 In_list ()
 {
-	NEEDLES="${1}"
+	local NEEDLE="${1}"
 	shift
 
-	for ITEM in ${@}
-	do
-		for NEEDLE in ${NEEDLES}
-		do
-			if [ "${NEEDLE}" = "${ITEM}" ]
-			then
-				return 0
-			fi
-		done
+	local ITEM
+	for ITEM in "${@}"; do
+		if [ "${NEEDLE}" = "${ITEM}" ]; then
+			return 0
+		fi
 	done
 
 	return 1
@@ -34,8 +31,8 @@ In_list ()
 
 Truncate ()
 {
-	for FILE in ${@}
-	do
+	local FILE
+	for FILE in "${@}"; do
 		if [ ! -L ${FILE} ]
 		then
 			: > ${FILE}

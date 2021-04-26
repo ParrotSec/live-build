@@ -1,6 +1,7 @@
 #!/bin/sh
 
 ## live-build(7) - System Build Scripts
+## Copyright (C) 2016-2020 The Debian Live team
 ## Copyright (C) 2006-2015 Daniel Baumann <mail@daniel-baumann.ch>
 ##
 ## This program comes with ABSOLUTELY NO WARRANTY; for details see COPYING.
@@ -14,20 +15,15 @@ set -e
 [ -e "${LIVE_BUILD}/scripts/build.sh" ] && . "${LIVE_BUILD}/scripts/build.sh" || . /usr/lib/live/build.sh
 
 # Setting static variables
-DESCRIPTION="$(Echo 'include local preseed in installer')"
-HELP=""
+DESCRIPTION="Include local preseed in installer"
 USAGE="${PROGRAM} [--force]"
 
-Arguments "${@}"
-
-# Reading configuration files
-Read_conffiles config/all config/common config/bootstrap config/chroot config/binary config/source
-Set_defaults
-
+# Processing arguments and configuration files
+Init_config_data "${@}"
 
 # Check d-i configuration
 case "${LB_DEBIAN_INSTALLER}" in
-	false)
+	none)
 		exit 0
 		;;
 esac
@@ -35,27 +31,16 @@ esac
 Echo_message "Begin including local preseeds..."
 
 # Checking stage file
-Check_stagefile .build/installer_preseed
+Check_stagefile
 
-# Checking lock file
-Check_lockfile .lock
-
-# Creating lock file
-Create_lockfile .lock
+# Acquire lock file
+Acquire_lockfile
 
 if ls config/preseed/*.cfg > /dev/null 2>&1 || \
    ls config/preseed/*.cfg.installer > /dev/null 2>&1 || \
    ls chroot/root/packages.installer > /dev/null 2>&1
 then
-	case "${LB_MODE}" in
-		progress-linux)
-			_DIRECTORY="binary/installer"
-			;;
-
-		*)
-			_DIRECTORY="binary/install"
-			;;
-	esac
+	_DIRECTORY="binary/install"
 
 	rm -f "${_DIRECTORY}/preseed.cfg"
 
@@ -66,7 +51,7 @@ then
 			cat "${_FILE}" >> "${_DIRECTORY}/preseed.cfg"
 		fi
 	done
-
-	# Creating stage file
-	Create_stagefile .build/installer_preseed
 fi
+
+# Creating stage file
+Create_stagefile

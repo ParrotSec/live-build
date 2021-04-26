@@ -1,6 +1,7 @@
 #!/bin/sh
 
 ## live-build(7) - System Build Scripts
+## Copyright (C) 2016-2020 The Debian Live team
 ## Copyright (C) 2006-2015 Daniel Baumann <mail@daniel-baumann.ch>
 ##
 ## This program comes with ABSOLUTELY NO WARRANTY; for details see COPYING.
@@ -14,31 +15,30 @@ set -e
 [ -e "${LIVE_BUILD}/scripts/build.sh" ] && . "${LIVE_BUILD}/scripts/build.sh" || . /usr/lib/live/build.sh
 
 # Setting static variables
-DESCRIPTION="$(Echo 'installs grub-legacy into binary')"
-HELP=""
+DESCRIPTION="Installs grub-legacy into binary"
 USAGE="${PROGRAM} [--force]"
 
-Arguments "${@}"
+# Processing arguments and configuration files
+Init_config_data "${@}"
 
-# Reading configuration files
-Read_conffiles config/all config/common config/bootstrap config/chroot config/binary config/source
-Set_defaults
+if [ "${LB_BOOTLOADER_BIOS}" != "grub-legacy" ]; then
+	exit 0
+fi
 
-Check_First_Bootloader_Role "grub-legacy"
+if In_list "${LB_IMAGE_TYPE}" hdd netboot; then
+	exit 0
+fi
 
 Echo_message "Begin installing grub-legacy..."
 
 # Requiring stage file
-Require_stagefile .build/config .build/bootstrap
+Require_stagefiles config bootstrap
 
 # Checking stage file
-Check_stagefile .build/binary_grub-legacy
+Check_stagefile
 
-# Checking lock file
-Check_lockfile .lock
-
-# Creating lock file
-Create_lockfile .lock
+# Acquire lock file
+Acquire_lockfile
 
 # Check architecture
 Check_architectures amd64 i386
@@ -48,18 +48,18 @@ Check_crossarchitectures
 Check_package chroot /usr/sbin/grub grub-legacy
 
 # Restoring cache
-Restore_cache cache/packages.binary
+Restore_package_cache binary
 
 # Installing depends
-Install_package
+Install_packages
 
 # Local functions
 Grub_live_entry ()
 {
-	LABEL="${1}"
-	KERNEL="${2}"
-	INITRD="${3}"
-	APPEND="${4}"
+	local LABEL="${1}"
+	local KERNEL="${2}"
+	local INITRD="${3}"
+	local APPEND="${4}"
 
 	LINUX_LIVE="${LINUX_LIVE}\ntitle\t\tDebian GNU/Linux - ${LABEL}"
 	LINUX_LIVE="${LINUX_LIVE}\nkernel\t\t/${KERNEL} ${INITFS:+boot=${INITFS} }config LB_BOOTAPPEND_LIVE ${APPEND}"
@@ -68,47 +68,20 @@ Grub_live_entry ()
 
 Grub_install_entry ()
 {
-	LABEL="${1}"
-	KERNEL="${2}"
-	INITRD="${3}"
-	APPEND="${4}"
+	local LABEL="${1}"
+	local KERNEL="${2}"
+	local INITRD="${3}"
+	local APPEND="${4}"
 
-	QAPPEND="quiet"
+	local APPEND="${APPEND} LB_BOOTAPPEND_INSTALL"
 
-	for TYPE in Install Expert Rescue Auto
-	do
-		case "${TYPE}" in
-			Install)
-				TAPPEND="${APPEND} ${QAPPEND}"
-				;;
+	if [ "${LABEL}" != "expert" ] && [ "${LABEL}" != "expertgui" ]; then
+		APPEND="${APPEND} --- quiet"
+	fi
 
-			Expert)
-				TAPPEND="priority=low ${APPEND}"
-				;;
-
-			Rescue)
-				TAPPEND="rescue/enable=true ${APPEND} ${QAPPEND}"
-				;;
-
-			Auto)
-				TAPPEND="auto=true priority=critical ${APPEND} ${QAPPEND}"
-				;;
-		esac
-
-		case "${LABEL}" in
-			Text)
-				TYPE_SUFFIX=""
-				;;
-			GUI)
-				TYPE_SUFFIX="gui"
-				;;
-		esac
-
-
-		LINUX_INSTALL="${LINUX_INSTALL}\ntitle\t\t${LABEL} ${TYPE}"
-		LINUX_INSTALL="${LINUX_INSTALL}\nkernel\t\t/${KERNEL} ${TAPPEND} ${LB_BOOTAPPEND_INSTALL}"
-		LINUX_INSTALL="${LINUX_INSTALL}\ninitrd\t\t/${INITRD}"
-	done
+	LINUX_INSTALL="${LINUX_INSTALL}\ntitle\t\tDebian GNU/Linux - ${LABEL}"
+	LINUX_INSTALL="${LINUX_INSTALL}\nkernel\t\t/${KERNEL} ${APPEND}"
+	LINUX_INSTALL="${LINUX_INSTALL}\ninitrd\t\t/${INITRD}"
 }
 
 if [ -e "config/bootloaders/grub-legacy" ]
@@ -136,29 +109,16 @@ case "${LB_INITRAMFS}" in
 esac
 
 # Setting destination directory
-case "${LIVE_IMAGE_TYPE}" in
-	iso*|tar)
-		case "${LB_INITRAMFS}" in
-			live-boot)
-				DESTDIR_LIVE="binary/live"
-				;;
-
-			*)
-				DESTDIR_LIVE="binary/boot"
-				;;
-		esac
-
-		DESTDIR_INSTALL="binary/install"
+case "${LB_INITRAMFS}" in
+	live-boot)
+		DESTDIR_LIVE="binary/live"
 		;;
 
-	hdd*|netboot)
-		Echo_warning "Bootloader in this image type not yet supported by live-build."
-		Echo_warning "This would produce a not bootable image, aborting (FIXME)."
-		exit 1
-	;;
+	*)
+		DESTDIR_LIVE="binary/boot"
+		;;
 esac
-
-Check_multiarchitectures
+DESTDIR_INSTALL="binary/install"
 
 # Creating directory
 mkdir -p "${DESTDIR_LIVE}"
@@ -167,12 +127,6 @@ mkdir -p "${DESTDIR_LIVE}"
 if [ "${LB_UNION_FILESYSTEM}" != "overlay" ]
 then
 	LB_BOOTAPPEND_LIVE="${LB_BOOTAPPEND_LIVE} union=${LB_UNION_FILESYSTEM}"
-fi
-
-if [ -n "${LB_NET_COW_PATH}" ]
-then
-	Echo_error "Net cow not yet supported on grub-legacy"
-	exit 1
 fi
 
 LB_BOOTAPPEND_LIVE="$(echo ${LB_BOOTAPPEND_LIVE} | sed -e 's|  ||')"
@@ -184,25 +138,25 @@ DEFAULT_FLAVOUR="$(echo ${LB_LINUX_FLAVOURS} | awk '{ print $1 }')"
 DEFAULT_KERNEL="$(basename chroot/boot/vmlinuz-*${DEFAULT_FLAVOUR})"
 DEFAULT_INITRD="initrd.img-$(echo ${DEFAULT_KERNEL} | sed -e 's|vmlinuz-||')"
 
-Grub_live_entry "live" "$(basename ${DESTDIR_LIVE})/${DEFAULT_KERNEL}" "$(basename ${DESTDIR_LIVE})/${DEFAULT_INITRD}"
+Grub_live_entry "live" "$(basename ${DESTDIR_LIVE})/${DEFAULT_KERNEL}" "$(basename ${DESTDIR_LIVE})/${DEFAULT_INITRD}" "${LB_BOOTAPPEND_LIVE}"
 
-if [ "${LB_BOOTAPPEND_FAILSAFE}" != "none" ]
+if [ "${LB_BOOTAPPEND_LIVE_FAILSAFE}" != "none" ]
 then
-	Grub_live_entry "live (fail-safe mode)" "$(basename ${DESTDIR_LIVE})/${DEFAULT_KERNEL}" "$(basename ${DESTDIR_LIVE})/${DEFAULT_INITRD}" "${LB_BOOTAPPEND_FAILSAFE}"
+	Grub_live_entry "live (fail-safe mode)" "$(basename ${DESTDIR_LIVE})/${DEFAULT_KERNEL}" "$(basename ${DESTDIR_LIVE})/${DEFAULT_INITRD}" "${LB_BOOTAPPEND_LIVE_FAILSAFE}"
 fi
 
 for KERNEL in chroot/boot/vmlinuz-*
 do
 	VERSION="$(basename ${KERNEL} | sed -e 's|vmlinuz-||')"
 
-	Grub_live_entry "live, kernel ${VERSION}" "$(basename ${DESTDIR_LIVE})/$(basename ${KERNEL})" "$(basename ${DESTDIR_LIVE})/initrd.img-${VERSION}"
-	Grub_live_entry "live, kernel ${VERSION} (fail-safe mode)" "$(basename ${DESTDIR_LIVE})/$(basename ${KERNEL})" "$(basename ${DESTDIR_LIVE})/initrd.img-${VERSION}" "${LB_BOOTAPPEND_FAILSAFE}"
+	Grub_live_entry "live, kernel ${VERSION}" "$(basename ${DESTDIR_LIVE})/$(basename ${KERNEL})" "$(basename ${DESTDIR_LIVE})/initrd.img-${VERSION}" "${LB_BOOTAPPEND_LIVE}"
+	Grub_live_entry "live, kernel ${VERSION} (fail-safe mode)" "$(basename ${DESTDIR_LIVE})/$(basename ${KERNEL})" "$(basename ${DESTDIR_LIVE})/initrd.img-${VERSION}" "${LB_BOOTAPPEND_LIVE_FAILSAFE}"
 done
 
 LINUX_LIVE="$(/bin/echo ${LINUX_LIVE} | sed -e 's|binary||g' -e 's|//|/|g')"
 
 # Assembling debian-installer configuration
-if [ "${LB_DEBIAN_INSTALLER}" != "false" ]
+if [ "${LB_DEBIAN_INSTALLER}" != "none" ]
 then
 	LINUX_LIVE="title\t\tLive:\nroot\n\n${LINUX_LIVE}"
 	LINUX_INSTALL="title\t\tInstaller:\nroot"
@@ -213,16 +167,24 @@ then
 
 	VMLINUZ_GI="install/gtk/vmlinuz"
 	INITRD_GI="install/gtk/initrd.gz"
-	APPEND_GI="video=vesa:ywrap,mtrr vga=788"
+	APPEND_GI="vga=788"
 
 	if [ -f "binary/${VMLINUZ_GI}" ] && [ -f "binary/${INITRD_GI}" ]
 	then
-		Grub_install_entry "GUI" "${VMLINUZ_GI}" "${INITRD_GI}" "${APPEND_GI}"
+		Grub_install_entry "GUI Install" "${VMLINUZ_GI}" "${INITRD_GI}" "${APPEND_GI}"
+		Grub_install_entry "GUI Expert" "${VMLINUZ_GI}" "${INITRD_GI}" "priority=low ${APPEND_GI}"
+		Grub_install_entry "GUI Rescue" "${VMLINUZ_GI}" "${INITRD_GI}" "rescue/enable=true ${APPEND_GI}"
+		Grub_install_entry "GUI Auto" "${VMLINUZ_GI}" "${INITRD_GI}" "auto=true priority=critical ${APPEND_GI}"
+		# Note, the following speech synthesis entry deliberately uses graphical kernel, but normal video params, copying the official Debian install disc
+		Grub_install_entry "GUI Install with speech synthesis" "${VMLINUZ_GI}" "${INITRD_GI}" "speakup.synth=soft ${APPEND_GI}"
 	fi
 
 	if [ -f "binary/${VMLINUZ_DI}" ] && [ -f "binary/${INITRD_DI}" ]
 	then
-		Grub_install_entry "Text" "${VMLINUZ_DI}" "${INITRD_DI}" "${APPEND_DI}"
+		Grub_install_entry "Text Install" "${VMLINUZ_DI}" "${INITRD_DI}" "${APPEND_DI}"
+		Grub_install_entry "Text Expert" "${VMLINUZ_DI}" "${INITRD_DI}" "priority=low ${APPEND_DI}"
+		Grub_install_entry "Text Rescue" "${VMLINUZ_DI}" "${INITRD_DI}" "rescue/enable=true ${APPEND_DI}"
+		Grub_install_entry "Text Auto" "${VMLINUZ_DI}" "${INITRD_DI}" "auto=true priority=critical ${APPEND_DI}"
 	fi
 fi
 
@@ -240,12 +202,12 @@ fi
 mkdir -p binary/boot/grub
 cp -r "${_SOURCE}"/* binary/boot/grub
 
-case ${LIVE_IMAGE_TYPE} in
-	iso*)
+case ${LB_IMAGE_TYPE} in
+	iso|iso-hybrid)
 		FILES="chroot/usr/lib/grub/*/stage2_eltorito"
 		;;
 
-	hdd*|tar)
+	hdd|tar)
 		FILES="chroot/usr/lib/grub/*/stage1 chroot/usr/lib/grub/*/e2fs_stage1_5 chroot/usr/lib/grub/*/stage2"
 		;;
 esac
@@ -259,15 +221,15 @@ fi
 cp ${FILES} binary/boot/grub
 
 sed -i -e "s|LINUX_LIVE|${LINUX_LIVE}|" -e "s|LINUX_INSTALL|${LINUX_INSTALL}|" -e "s|MEMTEST|${MEMTEST}|" binary/boot/grub/menu.lst
-sed -i -e "s#LB_BOOTAPPEND_INSTALL#${LB_BOOTAPPEND_INSTALL}#" -e "s#LB_BOOTAPPEND_LIVE#${LB_BOOTAPPEND_LIVE}#" binary/boot/grub/menu.lst
+sed -i -e "s#LB_BOOTAPPEND_INSTALL#${LB_BOOTAPPEND_INSTALL}#" binary/boot/grub/menu.lst
 
 sed -i -e 's|\ $||g' binary/boot/grub/menu.lst
 
 # Saving cache
-Save_cache cache/packages.binary
+Save_package_cache binary
 
 # Removing depends
-Remove_package
+Remove_packages
 
 # Creating stage file
-Create_stagefile .build/binary_grub
+Create_stagefile

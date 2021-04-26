@@ -1,6 +1,7 @@
 #!/bin/sh
 
 ## live-build(7) - System Build Scripts
+## Copyright (C) 2016-2020 The Debian Live team
 ## Copyright (C) 2006-2015 Daniel Baumann <mail@daniel-baumann.ch>
 ##
 ## This program comes with ABSOLUTELY NO WARRANTY; for details see COPYING.
@@ -13,96 +14,79 @@ set -e
 # Including common functions
 [ -e "${LIVE_BUILD}/scripts/build.sh" ] && . "${LIVE_BUILD}/scripts/build.sh" || . /usr/lib/live/build.sh
 
-# Automatically populating config tree
-if [ -x auto/config ] && [ ! -e .build/config ]
-then
-	Echo_message "Automatically populating config tree."
-	lb config
-fi
-
 # Setting static variables
-DESCRIPTION="$(Echo 'build binary images')"
-HELP=""
+DESCRIPTION="Build binary images"
 USAGE="${PROGRAM} [--force]"
 
-Arguments "${@}"
+# Automatically populating config tree
+Auto_build_config
 
-# Reading configuration files
-Read_conffiles config/all config/common config/bootstrap config/chroot config/binary config/source
-Set_defaults
+# Processing arguments and configuration files
+Init_config_data "${@}"
 
-# Setup cleanup function
-Setup_cleanup
+# Setting up cleanup function
+Setup_clean_exit
 
 # Preparing root filesystem
-lb binary_chroot ${@}
+lb binary_chroot "${@}"
 
-if [ "${LB_BUILD_WITH_CHROOT}" = "true" ]
-then
+# Chroot preparation component lists
+# We deliberately exclude 'debianchroot'
+CHROOT_PREP_MOUNTS="devpts proc selinuxfs sysfs"
+CHROOT_PREP_OTHER="dpkg tmpfs sysv-rc hosts resolv hostname apt"
+
+if [ "${LB_BUILD_WITH_CHROOT}" = "true" ]; then
 	# Configuring chroot
-	lb chroot_devpts install ${@}
-	lb chroot_proc install ${@}
-	lb chroot_selinuxfs install ${@}
-	lb chroot_sysfs install ${@}
-	lb chroot_hosts install ${@}
-	lb chroot_resolv install ${@}
-	lb chroot_hostname install ${@}
-	lb chroot_sysv-rc install ${@}
-	lb chroot_apt install-binary ${@}
-	lb chroot_archives chroot install ${@}
+	# FIXME: cannot run in 'all' mode while excluding 'debianchroot', do we really need to exclude it?
+	#lb chroot_prep install all mode-apt-install-binary mode-archives-chroot "${@}"
+	lb chroot_prep install "${CHROOT_PREP_MOUNTS}" "${@}"
+	lb chroot_prep install "${CHROOT_PREP_OTHER}" mode-apt-install-binary mode-archives-chroot "${@}"
+	lb chroot_archives chroot install "${@}"
 fi
 
 # Building root filesystem
-lb binary_rootfs ${@}
-lb binary_manifest ${@}
+lb binary_rootfs "${@}"
+lb binary_manifest "${@}"
 
 # Prepare images
-lb binary_package-lists ${@}
-lb binary_linux-image ${@}
-lb binary_memtest ${@}
-lb binary_grub-legacy ${@}
-lb binary_grub-pc ${@}
-lb binary_loopback_cfg ${@}
-lb binary_syslinux ${@}
-lb binary_disk ${@}
-lb binary_loadlin ${@}
-lb binary_win32-loader ${@}
-lb binary_includes ${@}
-lb binary_grub-efi ${@}
-lb binary_hooks ${@}
-lb binary_checksums ${@}
+lb binary_package-lists "${@}"
+lb binary_linux-image "${@}"
+lb binary_memtest "${@}"
+lb binary_grub-legacy "${@}"
+lb binary_grub-pc "${@}"
+lb binary_grub_cfg "${@}"
+lb binary_syslinux "${@}"
+lb binary_disk "${@}"
+lb binary_loadlin "${@}"
+lb binary_win32-loader "${@}"
+lb binary_includes "${@}"
+lb binary_grub-efi "${@}"
+lb binary_hooks "${@}"
+lb binary_checksums "${@}"
 
-if [ "${LB_BUILD_WITH_CHROOT}" != "true" ]
-then
-	lb chroot_devpts install ${@}
-	lb chroot_proc install ${@}
-	lb chroot_selinuxfs install ${@}
-	lb chroot_sysfs install ${@}
+if [ "${LB_BUILD_WITH_CHROOT}" != "true" ]; then
+	lb chroot_prep install "${CHROOT_PREP_MOUNTS}" "${@}"
 fi
+
+# Apply SOURCE_DATE_EPOCH to all modified and created files
+find binary -newermt "$(date -d@${SOURCE_DATE_EPOCH} '+%Y-%m-%d %H:%M:%S')" -printf "%y %p\n" -exec touch '{}' -d@${SOURCE_DATE_EPOCH} --no-dereference ';' > binary.modified_timestamps
 
 # Building images
-lb binary_iso ${@}
-lb binary_onie ${@}
-lb binary_netboot ${@}
-lb binary_tar ${@}
-lb binary_hdd ${@}
+lb binary_iso "${@}"
+lb binary_onie "${@}"
+lb binary_netboot "${@}"
+lb binary_tar "${@}"
+lb binary_hdd "${@}"
 
-lb binary_zsync ${@}
+lb binary_zsync "${@}"
 
-if [ "${LB_BUILD_WITH_CHROOT}" = "true" ]
-then
+if [ "${LB_BUILD_WITH_CHROOT}" = "true" ]; then
 	# Deconfiguring chroot
-	rm -f .build/chroot_archives
-	lb chroot_apt remove ${@}
-	lb chroot_hostname remove ${@}
-	lb chroot_resolv remove ${@}
-	lb chroot_hosts remove ${@}
-	lb chroot_sysv-rc remove ${@}
-	lb chroot_dpkg remove ${@}
-	lb chroot_debianchroot remove ${@}
+	Remove_stagefile chroot_archives
+
+	lb chroot_prep remove "${CHROOT_PREP_OTHER}" "${@}"
 fi
 
-lb chroot_sysfs remove ${@}
-lb chroot_selinuxfs remove ${@}
-lb chroot_proc remove ${@}
-lb chroot_devpts remove ${@}
+lb chroot_prep remove "${CHROOT_PREP_MOUNTS}" "${@}"
+
+Echo_message "Binary stage completed"

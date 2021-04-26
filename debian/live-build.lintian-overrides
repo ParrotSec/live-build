@@ -1,4 +1,4 @@
-live-build: symlink-should-be-relative
+live-build: absolute-symlink-in-top-level-folder
 # Those cases are legitimate uses of direct access to the database
 live-build: uses-dpkg-database-directly usr/lib/live/build/chroot_tmpfs
 live-build: uses-dpkg-database-directly usr/lib/live/build/clean

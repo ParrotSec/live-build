@@ -1,6 +1,7 @@
 #!/bin/sh
 
 ## live-build(7) - System Build Scripts
+## Copyright (C) 2016-2020 The Debian Live team
 ## Copyright (C) 2006-2015 Daniel Baumann <mail@daniel-baumann.ch>
 ##
 ## This program comes with ABSOLUTELY NO WARRANTY; for details see COPYING.
@@ -14,308 +15,215 @@ set -e
 [ -e "${LIVE_BUILD}/scripts/build.sh" ] && . "${LIVE_BUILD}/scripts/build.sh" || . /usr/lib/live/build.sh
 
 # Setting static variables
-DESCRIPTION="$(Echo 'manage /etc/apt/apt.conf')"
-HELP=""
+DESCRIPTION="Manage /etc/apt/apt.conf"
 USAGE="${PROGRAM} {install|install-binary|remove} [--force]"
 
-Arguments "${@}"
+# Processing arguments and configuration files
+Init_config_data "${@}"
 
-# Reading configuration files
-Read_conffiles config/all config/common config/bootstrap config/chroot config/binary config/source
-Set_defaults
+_ACTION="${1}"
+shift
 
 # Requiring stage file
-Require_stagefile .build/config .build/bootstrap
+Require_stagefiles config bootstrap
 
-case "${1}" in
+CONFD="chroot/etc/apt/apt.conf.d"
+
+case "${_ACTION}" in
 	install|install-binary)
 		Echo_message "Configuring file /etc/apt/apt.conf"
 
 		# Checking stage file
-		Check_stagefile .build/chroot_apt
+		Check_stagefile
 
-		# Checking lock file
-		Check_lockfile .lock
+		# Acquire lock file
+		Acquire_lockfile
 
-		# Creating lock file
-		Create_lockfile .lock
-
-		mkdir -p chroot/etc/apt/apt.conf.d
+		mkdir -p ${CONFD}
 
 		# Configuring apt ftp proxy
 		if [ -n "${LB_APT_FTP_PROXY}" ]
 		then
-			echo "Acquire::ftp::Proxy \"${LB_APT_FTP_PROXY}\";" > chroot/etc/apt/apt.conf.d/00ftp-proxy
+			echo "Acquire::ftp::Proxy \"${LB_APT_FTP_PROXY}\";" > ${CONFD}/00ftp-proxy
 		fi
 
 		# Configuring apt http proxy
 		if [ -n "${LB_APT_HTTP_PROXY}" ]
 		then
-			echo "Acquire::http::Proxy \"${LB_APT_HTTP_PROXY}\";" > chroot/etc/apt/apt.conf.d/00http-proxy
+			echo "Acquire::http::Proxy \"${LB_APT_HTTP_PROXY}\";" > ${CONFD}/00http-proxy
 		fi
 
 		# Configuring apt pipeline
 		if [ -n "${LB_APT_PIPELINE}" ]
 		then
-			echo "Acquire::http::Pipeline-Depth \"${LB_APT_PIPELINE}\";" > chroot/etc/apt/apt.conf.d/00pipeline
+			echo "Acquire::http::Pipeline-Depth \"${LB_APT_PIPELINE}\";" > ${CONFD}/00pipeline
 		fi
 
 		# Configuring apt recommends
 		case "${LB_APT_RECOMMENDS}" in
 			true)
-				echo "APT::Install-Recommends \"true\";" > chroot/etc/apt/apt.conf.d/00recommends
-				echo "Aptitude::Recommends-Important \"true\";" >> chroot/etc/apt/apt.conf.d/00recommends
+				echo "APT::Install-Recommends \"true\";" > ${CONFD}/00recommends
+				echo "Aptitude::Recommends-Important \"true\";" >> ${CONFD}/00recommends
 				;;
 
 			false)
-				echo "APT::Install-Recommends \"false\";" > chroot/etc/apt/apt.conf.d/00recommends
-				echo "Aptitude::Recommends-Important \"false\";" >> chroot/etc/apt/apt.conf.d/00recommends
+				echo "APT::Install-Recommends \"false\";" > ${CONFD}/00recommends
+				echo "Aptitude::Recommends-Important \"false\";" >> ${CONFD}/00recommends
 				;;
 		esac
 
 		# Configuring apt secure
 		case "${LB_APT_SECURE}" in
 			true)
-				echo "APT::Get::AllowUnauthenticated \"false\";" > chroot/etc/apt/apt.conf.d/00secure
-				echo "Aptitude::CmdLine::Ignore-Trust-Violations \"false\";" >> chroot/etc/apt/apt.conf.d/00secure
-				echo "Acquire::AllowInsecureRepositories \"false\";" >> chroot/etc/apt/apt.conf.d/00secure
+				echo "APT::Get::AllowUnauthenticated \"false\";" > ${CONFD}/00secure
+				echo "Aptitude::CmdLine::Ignore-Trust-Violations \"false\";" >> ${CONFD}/00secure
+				echo "Acquire::AllowInsecureRepositories \"false\";" >> ${CONFD}/00secure
 				;;
 
 			false)
-				echo "APT::Get::AllowUnauthenticated \"true\";" > chroot/etc/apt/apt.conf.d/00secure
-				echo "Aptitude::CmdLine::Ignore-Trust-Violations \"true\";" >> chroot/etc/apt/apt.conf.d/00secure
-				echo "Acquire::AllowInsecureRepositories \"true\";" >> chroot/etc/apt/apt.conf.d/00secure
+				echo "APT::Get::AllowUnauthenticated \"true\";" > ${CONFD}/00secure
+				echo "Aptitude::CmdLine::Ignore-Trust-Violations \"true\";" >> ${CONFD}/00secure
+				echo "Acquire::AllowInsecureRepositories \"true\";" >> ${CONFD}/00secure
 				;;
 		esac
 
 		# Configuring apt config
-		if [ -f config/apt/apt.conf ]
-		then
-			if [ -f chroot/etc/apt/apt.conf ]
-			then
-				mv chroot/etc/apt/apt.conf chroot/etc/apt/apt.conf.orig
+		CONFIG_FILE="config/apt/apt.conf"
+		CHROOT_FILE="chroot/etc/apt/apt.conf"
+		if [ -f ${CONFIG_FILE} ]; then
+			if [ -f ${CHROOT_FILE} ]; then
+				mv ${CHROOT_FILE} ${CHROOT_FILE}.orig
 			fi
-
-			cp config/apt/apt.conf chroot/etc/apt/apt.conf
+			cp ${CONFIG_FILE} ${CHROOT_FILE}
 		fi
 
 		# Configuring apt preferences
-		if [ -f config/apt/preferences ]
-		then
-			if [ -f chroot/etc/apt/preferences ]
-			then
-				mv chroot/etc/apt/preferences chroot/etc/apt/preferences.orig
+		CONFIG_FILE="config/apt/preferences"
+		CHROOT_FILE="chroot/etc/apt/preferences"
+		if [ -f ${CONFIG_FILE} ]; then
+			if [ -f ${CHROOT_FILE} ]; then
+				mv ${CHROOT_FILE} ${CHROOT_FILE}.orig
 			fi
-
-			cp config/apt/preferences chroot/etc/apt/preferences
+			cp ${CONFIG_FILE} ${CHROOT_FILE}
 		fi
 
-		if Find_files config/apt/*.pref
-		then
-			for _FILE in config/apt/*.pref
-			do
-				if [ -f chroot/etc/apt/preferences.d/$(basename ${_FILE}) ]
-				then
-					mv chroot/etc/apt/preferences.d/$(basename ${_FILE}) chroot/etc/apt/preferences.d/$(basename ${_FILE}).orig
+		if Find_files config/apt/*.pref; then
+			for CONFIG_FILE in config/apt/*.pref; do
+				CHROOT_FILE="chroot/etc/apt/preferences.d/$(basename ${CONFIG_FILE})"
+				if [ -f ${CHROOT_FILE} ]; then
+					mv ${CHROOT_FILE} ${CHROOT_FILE}.orig
 				fi
-
-				cp -aL ${_FILE} chroot/etc/apt/preferences.d
+				cp -aL ${CONFIG_FILE} chroot/etc/apt/preferences.d
 			done
 		fi
 
 		if Find_files config/packages.chroot/*.deb || Find_files config/packages/*.deb
 		then
-			echo >> chroot/etc/apt/preferences
-			echo "# Added by lb_chroot_apt ${@}" >> chroot/etc/apt/preferences
-			echo "Package: *" >> chroot/etc/apt/preferences
-			echo "Pin: release o=config/packages.chroot" >> chroot/etc/apt/preferences
+			CHROOT_FILE="chroot/etc/apt/preferences"
+			echo >> ${CHROOT_FILE}
+			echo "# Added by lb_chroot_apt ${_ACTION} ${@}" >> ${CHROOT_FILE}
+			echo "Package: *" >> ${CHROOT_FILE}
+			echo "Pin: release o=config/packages.chroot" >> ${CHROOT_FILE}
 
-			case "${1}" in
+			case "${_ACTION}" in
 				install)
 					# Ensure local packages have priority
-					echo "Pin-Priority: 1001" >> chroot/etc/apt/preferences
+					echo "Pin-Priority: 1001" >> ${CHROOT_FILE}
 					;;
 
 				install-binary)
 					# Ensure local packages are not re-installed during lb_binary
-					echo "Pin-Priority: 99" >> chroot/etc/apt/preferences
+					echo "Pin-Priority: 99" >> ${CHROOT_FILE}
 
-					echo >> chroot/etc/apt/preferences
-					echo "Package: *" >> chroot/etc/apt/preferences
-					echo "Pin: release o=debian" >> chroot/etc/apt/preferences
-					echo "Pin-Priority: 99" >> chroot/etc/apt/preferences
+					echo >> ${CHROOT_FILE}
+					echo "Package: *" >> ${CHROOT_FILE}
+					echo "Pin: release o=debian" >> ${CHROOT_FILE}
+					echo "Pin-Priority: 99" >> ${CHROOT_FILE}
 					;;
 			esac
 		fi
 
-		case "${LB_MODE}" in
-			progress-linux)
-				if [ ! -e chroot/etc/apt/preferences.d/progress-linux.pref ]
-				then
-					_DISTRIBUTION="$(echo ${LB_DISTRIBUTION_BINARY} | sed -e 's|-backports||')"
-
-					_ENABLE_DISTRIBUTIONS="${_DISTRIBUTION}"
-					_DISABLE_DISTRIBUTIONS=""
-
-					if [ "${LB_SECURITY}" = "true" ]
-					then
-						_ENABLE_DISTRIBUTIONS="${_ENABLE_DISTRIBUTIONS} ${_DISTRIBUTION}-security"
-					fi
-
-					if [ "${LB_UPDATES}" = "true" ]
-					then
-						_ENABLE_DISTRIBUTIONS="${_ENABLE_DISTRIBUTIONS} ${_DISTRIBUTION}-updates"
-					fi
-
-					case "${LB_DISTRIBUTION_BINARY}" in
-						*-backports)
-							if [ "${LB_BACKPORTS}" = "true" ]
-							then
-								_ENABLE_DISTRIBUTIONS="${_ENABLE_DISTRIBUTIONS} ${_DISTRIBUTION}-backports"
-							fi
-							;;
-
-						*)
-							if [ "${LB_BACKPORTS}" = "true" ]
-							then
-								_DISABLE_DISTRIBUTIONS="${_DISABLE_DISTRIBUTIONS} ${_DISTRIBUTION}-backports"
-							fi
-							;;
-					esac
-
-					for _DISTRIBUTION in ${_ENABLE_DISTRIBUTIONS}
-					do
-
-cat >> chroot/etc/apt/preferences.d/progress-linux.pref << EOF
-
-Package: *
-Pin: release n=${_DISTRIBUTION}
-Pin-Priority: 999
-EOF
-
-					done
-
-					for _DISTRIBUTION in ${_DISABLE_DISTRIBUTIONS}
-					do
-
-cat >> chroot/etc/apt/preferences.d/progress-linux.pref << EOF
-
-#Package: *
-#Pin: release n=${_DISTRIBUTION}
-#Pin-Priority: 999
-EOF
-
-					done
-				fi
-				;;
-		esac
-
 		# Creating stage file
-		Create_stagefile .build/chroot_apt
+		Create_stagefile
 		;;
 
 	remove)
 		Echo_message "Deconfiguring file /etc/apt/apt.conf"
 
-		# Checking lock file
-		Check_lockfile .lock
+		# Checking stage file
+		Ensure_stagefile_exists
 
-		# Creating lock file
-		Create_lockfile .lock
+		# Acquire lock file
+		Acquire_lockfile
 
 		# Deconfiguring aptitude ftp proxy
-		rm -f chroot/etc/apt/apt.conf.d/00ftp-proxy
+		rm -f ${CONFD}/00ftp-proxy
 
 		# Deconfiguring aptitude http proxy
-		rm -f chroot/etc/apt/apt.conf.d/00http-proxy
+		rm -f ${CONFD}/00http-proxy
 
 		# Deconfiguring aptitude pipeline
-		rm -f chroot/etc/apt/apt.conf.d/00pipeline
+		rm -f ${CONFD}/00pipeline
 
 		# Deconfiguring aptitude recommends
-		if [ "${LB_APT_RECOMMENDS}" = "true" ]
-		then
-			rm -f chroot/etc/apt/apt.conf.d/00recommends
+		if [ "${LB_APT_RECOMMENDS}" = "true" ]; then
+			rm -f ${CONFD}/00recommends
 		fi
 
 		# Deconfiguring aptitude secure
-		if [ "${LB_APT_SECURE}" = "true" ]
-		then
-			rm -f chroot/etc/apt/apt.conf.d/00secure
+		if [ "${LB_APT_SECURE}" = "true" ]; then
+			rm -f ${CONFD}/00secure
 		fi
 
 		# Configuring apt config
-		if [ -f config/apt/apt.conf ]
-		then
-			if [ -f chroot/etc/apt/apt.conf ]
-			then
-				mv chroot/etc/apt/apt.conf chroot/etc/apt/apt.conf.orig
-			fi
+		CONFIG_FILE="config/apt/apt.conf"
+		CHROOT_FILE="chroot/etc/apt/apt.conf"
+		if [ -f ${CONFIG_FILE} ]; then
+			rm -f ${CHROOT_FILE}
 
-			cp config/apt/apt.conf chroot/etc/apt/apt.conf
-
-			if [ -f chroot/etc/apt/apt.conf.orig ]
-			then
-				mv chroot/etc/apt/apt.conf.orig chroot/etc/apt/apt.conf
+			if [ -f ${CHROOT_FILE}.orig ]; then
+				mv ${CHROOT_FILE}.orig ${CHROOT_FILE}
 			fi
 		fi
 
 		# Deconfiguring apt preferences
-		if [ -f config/apt/preferences ]
-		then
-			if [ -f chroot/etc/apt/preferences ]
-			then
-				mv chroot/etc/apt/preferences chroot/etc/apt/preferences.orig
+		CONFIG_FILE="config/apt/preferences"
+		CHROOT_FILE="chroot/etc/apt/preferences"
+		if [ -f ${CONFIG_FILE} ]; then
+			rm -f ${CHROOT_FILE}
+
+			if [ -f ${CHROOT_FILE}.orig ]; then
+				mv ${CHROOT_FILE}.orig ${CHROOT_FILE}
 			fi
-
-			cp config/apt/preferences chroot/etc/apt/preferences
-
-			if [ -f chroot/etc/apt/preferences.orig ]
-			then
-				mv chroot/etc/apt/preferences.orig chroot/etc/apt/preferences
+		elif [ -f ${CHROOT_FILE} ]; then
+			# delete additions from lb_chroot_apt install|install-binary to preferences
+			sed -i '/# Added by lb_chroot_apt/,$d' ${CHROOT_FILE}
+			# delete the last empty line
+			sed -i '${/^[[:blank:]]*$/d;}' ${CHROOT_FILE}
+			# if the resulting preferences file is empty, we must have created it, remove it
+			if [ ! -s ${CHROOT_FILE} ]; then
+				rm -f ${CHROOT_FILE}
 			fi
 		fi
 
-		if Find_files config/apt/*.pref
-		then
-			for _FILE in config/apt/*.pref
-			do
-				if [ -f chroot/etc/apt/preferences.d/$(basename ${_FILE}) ]
-				then
-					mv chroot/etc/apt/preferences.d/$(basename ${_FILE}) chroot/etc/apt/preferences.d/$(basename ${_FILE}).orig
-				fi
+		if Find_files config/apt/*.pref; then
+			for CONFIG_FILE in config/apt/*.pref; do
+				CHROOT_FILE="chroot/etc/apt/preferences.d/$(basename ${CONFIG_FILE})"
 
-				cp -aL ${_FILE} chroot/etc/apt/preferences.d
+				rm -f ${CHROOT_FILE}
 
-				if [ -f chroot/etc/apt/preferences.d/$(basename ${_FILE}).orig ]
-				then
-					mv chroot/etc/apt/preferences.d/$(basename ${_FILE}).orig chroot/etc/apt/preferences.d/$(basename ${_FILE})
+				if [ -f ${CHROOT_FILE}.orig ]; then
+					mv ${CHROOT_FILE}.orig ${CHROOT_FILE}
 				fi
 			done
 		fi
 
-		if Find_files config/packages.chroot/*.deb || Find_files config/packages/*.deb
-		then
-			if [ -f chroot/etc/apt/preferences ]
-			then
-				# delete additions from lb_chroot_apt install|install-binary to preferences
-				sed -i '/# Added by lb_chroot_apt/,$d' chroot/etc/apt/preferences
-				# delete the last empty line
-				sed -i '${/^[[:blank:]]*$/d;}' chroot/etc/apt/preferences
-				# if the resulting preferences file is empty there was no user additions, remove it
-				if [ ! -s chroot/etc/apt/preferences ]
-				then
-					rm -rf chroot/etc/apt/preferences
-				fi
-			fi
-
-		fi
-
 		# Removing stage file
-		rm -f .build/chroot_apt
+		Remove_stagefile
 		;;
 
 	*)
-		Usage
+		Echo_error "Invalid action parameter: '${_ACTION}'"
+		Usage --fail
 		;;
 esac

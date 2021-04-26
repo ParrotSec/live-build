@@ -1,6 +1,7 @@
 #!/bin/sh
 
 ## live-build(7) - System Build Scripts
+## Copyright (C) 2016-2020 The Debian Live team
 ## Copyright (C) 2006-2015 Daniel Baumann <mail@daniel-baumann.ch>
 ##
 ## This program comes with ABSOLUTELY NO WARRANTY; for details see COPYING.
@@ -14,42 +15,31 @@ set -e
 [ -e "${LIVE_BUILD}/scripts/build.sh" ] && . "${LIVE_BUILD}/scripts/build.sh" || . /usr/lib/live/build.sh
 
 # Setting static variables
-DESCRIPTION="$(Echo 'manage /sbin/dpkg')"
-HELP=""
+DESCRIPTION="Manage /sbin/dpkg"
 USAGE="${PROGRAM} {install|remove} [--force]"
 
-Arguments "${@}"
+# Processing arguments and configuration files
+Init_config_data "${@}"
 
-# Reading configuration files
-Read_conffiles config/all config/common config/bootstrap config/chroot config/binary config/source
-Set_defaults
+_ACTION="${1}"
+shift
 
 # Requiring stage file
-Require_stagefile .build/config .build/bootstrap
+Require_stagefiles config bootstrap
 
-case "${1}" in
+case "${_ACTION}" in
 	install)
 		Echo_message "Configuring file /sbin/start-stop-daemon"
 
 		# Checking stage file
-		Check_stagefile .build/chroot_dpkg
+		Check_stagefile
 
-		# Checking lock file
-		Check_lockfile .lock
-
-		# Creating lock file
-		Create_lockfile .lock
+		# Acquire lock file
+		Acquire_lockfile
 
 		# Create custom start-stop-daemon program
 		Chroot chroot dpkg-divert --rename --quiet --add /sbin/start-stop-daemon
-
-cat > chroot/sbin/start-stop-daemon << EOF
-#!/bin/sh
-
-exit 0
-EOF
-
-		chmod 755 chroot/sbin/start-stop-daemon
+		ln -fs /bin/true chroot/sbin/start-stop-daemon
 
 		# Disable dpkg syncing
 
@@ -67,17 +57,17 @@ EOF
 		ln -fs /bin/true chroot/usr/sbin/flash-kernel
 
 		# Creating stage file
-		Create_stagefile .build/chroot_dpkg
+		Create_stagefile
 		;;
 
 	remove)
 		Echo_message "Deconfiguring file /sbin/start-stop-daemon"
 
-		# Checking lock file
-		Check_lockfile .lock
+		# Checking stage file
+		Ensure_stagefile_exists
 
-		# Creating lock file
-		Create_lockfile .lock
+		# Acquire lock file
+		Acquire_lockfile
 
 		# Manual hacks for special packages
 
@@ -96,10 +86,11 @@ EOF
 		rm -f chroot/etc/dpkg/dpkg.cfg.d/live-build
 
 		# Removing stage file
-		rm -f .build/chroot_dpkg
+		Remove_stagefile
 		;;
 
 	*)
-		Usage
+		Echo_error "Invalid action parameter: '${_ACTION}'"
+		Usage --fail
 		;;
 esac

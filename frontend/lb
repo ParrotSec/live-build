@@ -1,6 +1,7 @@
 #!/bin/sh
 
 ## live-build(7) - System Build Scripts
+## Copyright (C) 2016-2020 The Debian Live team
 ## Copyright (C) 2006-2015 Daniel Baumann <mail@daniel-baumann.ch>
 ##
 ## This program comes with ABSOLUTELY NO WARRANTY; for details see COPYING.
@@ -11,80 +12,70 @@
 set -e
 
 # Including common functions
-[ -e "${LIVE_BUILD}/scripts/build.sh" ] && . "${LIVE_BUILD}/scripts/build.sh" || . /usr/lib/live/build.sh
+[ -n "${LIVE_BUILD}" ] && [ -e "${LIVE_BUILD}/scripts/build.sh" ] && . "${LIVE_BUILD}/scripts/build.sh" || . /usr/lib/live/build.sh
 
 # Setting static variables
-DESCRIPTION="$(Echo 'utility to build live systems')"
-HELP="FIXME"
-USAGE="FIXME"
+PROGRAM="${FRONTEND}"
+DESCRIPTION="Utility to build live systems"
+USAGE="lb {clean|config|build}"
 
-case "${1}" in
-	-h|--help)
-		if [ -x "$(which man 2>/dev/null)" ]
-		then
-			man lb
-			exit 0
-		else
-			${0} --usage
-			exit 0
-		fi
-		;;
+# This bits of code relies on the fact that we only accept
+# options without values before the real command.
+GLOBAL_ARGS=""
+while true; do
+	case $1 in
+		-*)
+			GLOBAL_ARGS="${GLOBAL_ARGS:+$GLOBAL_ARGS }$1"
+			shift
+			;;
+		*)
+			break
+			;;
+	esac
+done
+Arguments $GLOBAL_ARGS
 
-	""|-u|--usage)
-		Usage
-		;;
+if [ $# = 0 ]; then
+	Echo_error "Missing sub-command"
+	Usage --fail
+fi
 
-	-v|--version)
-		echo "${VERSION}"
-		exit 0
-		;;
+COMMAND="${1}"
+shift
 
-	*)
-		COMMAND="${1}"
-		shift
+if [ -x "${LIVE_BUILD}/scripts/build/${COMMAND}" ]; then
+	# User has live-build copied locally in the system
+	SCRIPT="${LIVE_BUILD}/scripts/build/${COMMAND}"
+elif [ -x "local/live-build/scripts/build/${COMMAND}" ]; then
+	# User has live-build copied locally in the config
+	SCRIPT="local/live-build/scripts/build/${COMMAND}";
+elif [ -x /usr/lib/live/build/${COMMAND} ]; then
+	# User has live-build installed in the system
+	SCRIPT=/usr/lib/live/build/"${COMMAND}"
+else
+	Echo_error "Unknown command: ${COMMAND}"
+	exit 1
+fi
 
-		ENV=""
+if [ "${COMMAND}" != "config" ]; then
+	# Checking user account
+	if [ "$(id -u)" -ne "0" ]; then
+		Echo_error "Root privileges needed!"
+		exit 1
+	fi
+fi
 
-		if [ "${COMMAND}" != "config" ]
-		then
-			# Checking user account
-			if [ "$(id -u)" -ne "0" ]
-			then
-				Echo_error "need root privileges"
-				exit 1
-			fi
-		fi
+ENV=""
+for _FILE in config/environment config/environment.binary; do
+	if [ -e "${_FILE}" ]; then
+		ENV="${ENV} $(grep -v '^#' ${_FILE})"
+	fi
+done
 
-		for _FILE in config/environment config/environment.binary
-		do
-			if [ -e "${_FILE}" ]
-			then
-				ENV="${ENV} $(grep -v '^#' ${_FILE})"
-			fi
-		done
+_CMD_LABEL="lb ${COMMAND}"
+if [ "${_COLOR_OUT}" = "true" ]; then
+	_CMD_LABEL="${CYAN}${_CMD_LABEL}${NO_COLOR}"
+fi
+Echo "[%s] ${_CMD_LABEL} %s" "$(date +'%F %T')" "$(echo ${GLOBAL_ARGS} ${@})"
 
-		if [ -x "${LIVE_BUILD}/scripts/build/${COMMAND}" ]
-		then
-			# User has live-build copied locally in the system
-			SCRIPT="${LIVE_BUILD}/scripts/build/${COMMAND}"
-		elif [ -x "local/live-build/scripts/build/${COMMAND}" ]
-		then
-			# User has live-build copied locally in the config
-			SCRIPT="local/live-build/scripts/build/${COMMAND}"
-		elif [ -x /usr/lib/live/build/${COMMAND} ]
-		then
-			# User has live-build installed in the system
-			SCRIPT=/usr/lib/live/build/"${COMMAND}"
-		elif [ -x "$(which ${COMMAND} 2>/dev/null)" ]
-		then
-			# User has live-build commands in path
-			SCRIPT="${COMMAND}"
-		else
-			Echo_error "no such script: ${COMMAND}"
-			exit 1
-		fi
-
-		Echo "[%s] %s" "$(date +'%F %T')" "lb ${COMMAND} $(echo ${@})"
-		${ENV} exec "${SCRIPT}" "${@}"
-		;;
-esac
+exec /usr/bin/env ${ENV} "${SCRIPT}" ${GLOBAL_ARGS} "${@}"

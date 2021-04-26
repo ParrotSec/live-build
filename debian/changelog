@@ -1,3 +1,268 @@
+live-build (1:20210217parrot1) rolling; urgency=medium
+
+  * Import new Debian release.
+  * Add symlinks to support parrot releases.
+
+ -- Lorenzo "Palinuro" Faletra <palinuro@parrotsec.org>  Mon, 26 Apr 2021 14:35:31 +0200
+
+live-build (1:20210216) unstable; urgency=medium
+
+  [ Raphaël Hertzog ]
+  * Add symlinks to support kali releases
+
+  [ Roland Clobus ]
+  * Reproducible fix for glibc
+
+  [ Ryan Finnie ]
+  * binary_syslinux: Do not modify grub theme.txt if grub/splash.png
+    exists
+  * Restore_package_cache: Handle existing but empty packages directory
+
+  [ Roland Clobus ]
+  * The local LIVE_BUILD wins over the system live-build for the list of
+    udeb inclusions. Only copy when the distribution is known
+  * The local LIVE_BUILD wins over the system live-build for the list of
+    udeb exclusions
+  * lilo is not available any more in Bullseye (and newer), see #973850
+  * Adding symlink for udeb data for bullseye
+
+  [ Luca Boccassi ]
+  * Fix build on architecture without syslinux (Closes: #982746)
+  * autopkgtest: restrict to amd64 and i386 for now
+
+  [ Roland Clobus ]
+  * mkfs.msdos needs at most 32 bits for the -i argument. Use the
+    hexadecimal version of SOURCE_DATE_EPOCH, limited to the lower 32 bits
+
+ -- Luca Boccassi <bluca@debian.org>  Tue, 16 Feb 2021 21:25:05 +0000
+
+live-build (1:20210122) unstable; urgency=medium
+
+  [ Raphaël Hertzog ]
+  * Get rid of extraneous whitespace showing up in syslinux menu
+  * Standardize on having the GUI installation first in boot menus
+  * config: obsolete --net-root-path
+  * Drop the epoch in /usr/share/live/build/VERSION
+  * Fix version computing when LIVE_BUILD is set
+  * binary_syslinux: rely on $LIVE_BUILD_VERSION instead of lb --version
+  * Add updated directives to enable cryptsetup support in initrd
+  * frontend: do no try to look for sub-commands in the PATH
+  * Synchronize syslinux menu structure with the grub-pc one
+  * Make librsvg2-bin dependency unconditional for syslinux
+  * Do not overwrite splash.png if the user has provided it
+  * Tell APT to retry downloads a few times before giving up
+  * Use bullseye as default release in preparation of the next stable release
+  * Use truncate --no-create --size=0 to truncate files
+  * Document our autopkgtest tests as needing internet access
+  * Update renamed lintian tag names in lintian overrides.
+  * Don't fail if one of the package lists expands to an empty list
+  * Fix a small info message
+  * autopkgtest: get rid of deprecated needs-recommends feature
+
+  [ David Hewitt ]
+  * binary_syslinux: Accommodate LB_INITRAMFS not live-boot
+
+  [ Lyndon Brown ]
+  * Lots of cleanup and refactoring.
+  * remove redundant files (Closes: #952834, #952835)
+  * source: fix wrong action value for script execution (Closes: #952837)
+  * archives: fix removal of chroot/root/packages.chroot package list
+    (Closes: #952838)
+  * archives: fix incorrect usage string (Closes: #952839)
+  * archives: add 'pass' param validation check (Closes: #952841)
+  * archives: fix deb-src entry exclusion (Closes: #952842)
+  * fix indentation (Closes: #952857)
+  * installer: de-dup daily DI url (Closes: #952860)
+  * don't unnecessarily convert exit codes to strings (Closes: #952861)
+  * source: fix mistaken append instead of overwrite (Closes: #952862)
+  * memtest: better handle obsolete LB_MEMTEST value (Closes: #952866)
+  * bootloaders: fix ignoring LB_DEBIAN_INSTALLER_GUI in menu creation
+    (Closes: #952890)
+  * chroot_dpkg: start-stop-daemon simplification (Closes: #952891)
+  * add missing shebangs to temp generated shell code files
+    (Closes: #952863)
+  * help/usage: fix incorrect program command (Closes: #952884)
+  * config: rename --architectures to --architecture (Closes: #952892)
+  * echo: fix problem with error printing (Closes: #952878)
+  * echo: ensure output goes to stdout/stderr (Closes: #952879)
+  * cursor: purge unused cursor functions (Closes: #952880)
+  * binary_iso: fix wrong echo helper (Closes: #952881)
+  * binarie_onie: fix missing use of echo helpers (Closes: #952882)
+  * binary_onie: fix lack of newline on error (Closes: #952883)
+  * installer: robustify udeb inclusion
+  * installer: filter derived udebs from parent list
+  * installer: download udebs directly from correct mirror
+    (Closes: #952914)
+  * firmware: avoid building unnecessary lists
+  * firmware: construct file location once and reuse
+  * firmware: fix possible duplication in firmware package lists
+    (inefficiency) (Closes: #952906)
+  * firmware: delete pointlessly cached (large) file after use
+    (Closes: #952907)
+  * firmware: de-dup firmware list parsing (Closes: #952908)
+  * firmware: reorder firmware list construction
+  * firmware: avoid potentially duplicate work (Closes: #952909)
+  * firmware: save the compressed contents file to disk instead of
+    decompressed (Closes: #952910)
+  * firmware: enable caching for archive content file with firmware lists
+    (Closes: #952911)
+  * fix inadequate chroot_archives validation
+  * fix consistency in binary execution and existance checking
+    (Closes: #952927)
+  * archives: tidy deb-src exclusion (Closes: #952928)
+  * installer: use boolean for clarity (Closes: #952930)
+  * top level cmd "auto redirect" handling (Closes: #952919)
+  * help/usage: remove pointless vars (Closes: #952859)
+  * archives: always include enabled/disabled deb-src apt entries
+    (Closes: #952929)
+    * copyright: add missing "The Debian Live team" entry
+  * remove obsolete loop-aes-utils related losetup hack
+  * debootstrap: use --force-check-gpg
+  * hide mountpoints from nautilus
+  * source: properly fix _apt permissions warning (Closes: #953957)
+  * fix -h|--help component script man page redirection
+  * strip progress-linux distro hacks
+  * grub-pc: fix broken boot capability (Closes: #956131)
+  * Fix permissions & ownership of copied /etc/resolv.conf (Closes: #857740)
+  * manpage: document that multiple archive areas should be space separated
+  * manpages: document space separation for --keyring-packages
+  * manpages: document that --linux-flavours is space separated
+  * manpages: fix typo (Closes: #926238)
+  * config: stop writing 'default: <foo>' lines to config files
+    (Closes: #904614)
+  * config: obsolete unused --isohybrid-options option
+  * config: obsolete unused --net-cow-* options
+  * config: obsolete --net-root-* options (except one)
+  * rename LB_ARCHITECTURES to LB_ARCHITECTURE
+  * rename LB_BOOTSTRAP_QEMU_ARCHITECTURES to LB_BOOTSTRAP_QEMU_ARCHITECTURE
+  * rename binary_loopback_cfg to binary_grub_cfg
+  * bootloaders: reorganise installer menu entries
+  * grub2: fix using wrong directory in certain cases (Closes: #952843)
+  * binary: fix missing use of chroot_dpkg in binary stage (Closes: #776532)
+  * bootstrap: drop obsolete check for `--no-check-gpg` support in debootstrap
+    (Closes: #952847)
+  * binary_rootfs: fix deletion of excludes file from wrong location in
+    squashfs after use (Closes: #952849)
+  * binary_rootfs: fix chmod of squashfs image only being applied when using
+    chroot (Closes: #952850)
+  * binary: fix missing handling of disk info for netboot case
+    (Closes: #952846)
+  * simplify --debian-installer choices (Closes: #952864)
+  * archives: fix mount local repo comments (Closes: #952873)
+  * fix capitalisation of some output messages (Closes: #952875)
+  * help/usage: avoid unnecessary use of echo helpers (Closes: #952877)
+  * chroot: fix redundant usage line (Closes: #952885)
+  * binary_disk: refactor (Closes: #952865)
+  * help/usage: fix overly complex script description handling
+    (Closes: #952887)
+  * fix missing use of echo helpers (Closes: #952876)
+  * archives: deduplicate apt sourcelist file construction (Closes: #952889)
+  * aliases: simplify excessively complex In_list function (Closes: #952915)
+  * cache: clarify and simplify package cache save/restore (Closes: #952916)
+  * source: add output of config readme file to source image (Closes: #952921)
+  * defaults: ensure global caching param overrides specific caching params if
+    disabled (Closes: #952923)
+  * simplify STAGE checks - use In_List (Closes: #952917)
+  * config: rename the config set/check functions for clarity
+    (Closes: #952920)
+  * chroot: improve directory creation/destruction efficiency
+    (Closes: #952924)
+  * source: downloaded pkgs to a clean directory rather than chroot root
+    (Closes: #952931)
+  * source: target downloads with corresponding version (Closes: #952932)
+  * strip useless multi-arch separate directory stuff
+  * locks: tidy lock acquisition (Closes: #952918)
+  * grub1/grub2/loopback: fix missing delimiter in menu kernel parameter lists
+    (Closes: #775143)
+  * syslinux: remove replacement of unused label in menu configs
+  * syslinux: fix shortcut caret appearing in menu entries
+  * syslinux: changed 'build' to 'built' in splash
+  * bootloaders: add install with speech synthesis menu entries
+  * syslinux: expand list of install options
+  * syslinux: add install menu entries only if including installer
+  * syslinux: add memtest menu entry only if including memtest
+  * syslinux: use more dynamic memtest menu config file
+
+  [ Luca Boccassi ]
+  * Fix Lintian Warnings about changelog: day-of-week, trailing whitespace
+  * Bump Standards-Version to 4.5.0, no changes.
+  * Add autopkgtest: default image build
+  * autopkgtest: build kali image
+  * autopkgtest: disable updates/security repositories, not available for
+    Bullseye
+
+  [ johnraff ]
+  * Replace 'which' with 'command -v' to test for the existance of an
+    executable This is considered to be more robust.
+
+  [ Steven Shiau ]
+  * Add grub EFI support for armhf arch.
+
+  [ adrian15 ]
+  * grub-efi: fix partial broken boot capability (Closes: #924053)
+
+  [ Ryan Finnie ]
+  * Add initial ppc64el support
+  * Enable arm64 for binary_grub_cfg
+  * architectures.sh: armhf/armel can be built on arm64
+  * grub-efi: Show fwsetup, do not show incompatible memtest even if enabled
+  * Bugfix: Fix grub.cfg pc/ENABLE_MEMTEST check
+
+  [ Victor Gavro ]
+  * chroot_apt: fixed adding Pin-Priority (broken in da1fab11)
+
+  [ Roland Clobus ]
+  * Some changes towards reproducible builds of live images and
+    various bugfixes discovered while working on this.
+  * A second invocation of 'lb config' will result in an identical settings
+    file
+  * Delay resolving the timestamp for the ISO volume to the moment the
+    ISO-image is created
+  * Preserve timestamps
+  * Add new manpage to the list of translatable files
+  * Ensure that SOURCE_DATE_EPOCH is always set in all sub scripts. When
+    SOURCE_DATE_EPOCH was already set before 'lb config', also enable UTC
+    timestamps.
+  * SOURCE_DATE_EPOCH is always set
+  * Use SOURCE_DATE_EPOCH for 'now' in the boot splash image
+  * Use SOURCE_DATE_EPOCH for 'now' in .disk/info
+  * Use SOURCE_DATE_EPOCH for the partition-id of /efi.img
+  * Use SOURCE_DATE_EPOCH for the partition-id of /boot/grub/efi.img
+  * Set timestamp embedded in EFI files
+  * Set timestamp in embedded files of the installer
+  * Apply SOURCE_DATE_EPOCH to newly generated files and create a log
+  * Bugfix: do not create /dev/lock and /dev/lock-frontend
+
+  [ Marcel Partap ]
+  * For 32bit UEFI secure boot, the package name is grub-efi-ia32-signed
+  * binary_rootfs stage: give custom MKSQUASHFS_OPTIONS precedence
+  * binary_rootfs stage: disable mksquashfs progress bar only in quiet mode
+  * binary_rootfs stage: slightly lower mksquashfs nice levels (19 -> 17)
+
+  [ Thore Sommer ]
+  * Add option to change compression algorithm and level for squashfs.
+  * Option for using systemd-nspawn instead of chroot for hooks.
+    (Closes: #965953)
+  * Added the option to include files before and after package installation
+    (Closes: #927128)
+
+  [ Matthijs Kooijman ]
+  * binary_iso: Execute mkdir binary/.disk before writing to it
+
+  [ Unit 193 ]
+  * Add 'unstable' as a valid distribution and link to sid.
+
+  [ Jan Kot ]
+  * bootstrap_debootstrap: change debootstrap path to /usr/sbin/debootstrap
+  * packages.sh: check for /etc/debian_version existance rather than
+    dpkg-query aviability
+  * exit.sh: fix selinux mountpoint
+
+  [ Steev Klimaszewski ]
+  * Add arm64 udeb include files
+
+ -- Raphaël Hertzog <raphael@offensive-security.com>  Fri, 22 Jan 2021 15:13:32 +0100
+
 live-build (1:20191221parrot1) rolling-testing; urgency=medium
 
   * Import new Debian release.

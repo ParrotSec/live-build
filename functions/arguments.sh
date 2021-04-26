@@ -1,6 +1,7 @@
 #!/bin/sh
 
 ## live-build(7) - System Build Scripts
+## Copyright (C) 2016-2020 The Debian Live team
 ## Copyright (C) 2006-2015 Daniel Baumann <mail@daniel-baumann.ch>
 ##
 ## This program comes with ABSOLUTELY NO WARRANTY; for details see COPYING.
@@ -10,67 +11,29 @@
 
 Arguments ()
 {
-	ARGUMENTS="$(getopt --longoptions breakpoints,color,conffile:,debug,force,help,quiet,usage,verbose,version --name=${PROGRAM} --options c:huv --shell sh -- "${@}")"
+	local LONGOPTS="breakpoints,color,debug,force,help,no-color,quiet,usage,verbose,version"
+	local SHORTOPTS="huv"
 
-	if [ "${?}" != "0" ]
-	then
-		Echo_error "terminating" >&2
+	local ARGUMENTS
+	local ERR=0
+	ARGUMENTS="$(getopt --shell sh --name "${PROGRAM}" --longoptions $LONGOPTS --options $SHORTOPTS -- "${@}")" || ERR=$?
+
+	if [ $ERR -eq 1 ]; then
+		Echo_error "invalid argument(s)"
+		exit 1
+	elif [ $ERR -ne 0 ]; then
+		Echo_error "getopt failure"
 		exit 1
 	fi
 
 	eval set -- "${ARGUMENTS}"
 
-	while true
-	do
-		case "${1}" in
-			--breakpoints)
-				_BREAKPOINTS="true"
+	while true; do
+		local ARG="${1}"
+		case "${ARG}" in
+			--breakpoints|--color|--debug|--force|-h|--help|--no-color|--quiet|-u|--usage|--verbose|-v|--version)
+				Handle_common_option "${ARG}"
 				shift
-				;;
-
-			--color)
-				_COLOR="true"
-				shift
-				;;
-
-			-c|--conffile)
-				_CONFFILE="${2}"
-				shift 2
-				;;
-
-			--debug)
-				_DEBUG="true"
-				shift
-				;;
-
-			--force)
-				_FORCE="true"
-				shift
-				;;
-
-			-h|--help)
-				Man
-				shift
-				;;
-
-			--quiet)
-				_QUIET="true"
-				shift
-				;;
-
-			-u|--usage)
-				Usage
-				shift
-				;;
-
-			--verbose)
-				_VERBOSE="true"
-				shift
-				;;
-
-			-v|--version)
-				echo "${VERSION}"
-				exit 0
 				;;
 
 			--)
@@ -79,9 +42,64 @@ Arguments ()
 				;;
 
 			*)
-				Echo_error "internal error %s" "${0}"
+				Echo_error "Internal error, unhandled option: %s" "${ARG}"
 				exit 1
 				;;
 		esac
 	done
+}
+
+Handle_common_option ()
+{
+	case "${1}" in
+		--breakpoints)
+			_BREAKPOINTS="true"
+			;;
+
+		--color)
+			_COLOR="true"
+			_COLOR_OUT="true"
+			_COLOR_ERR="true"
+			;;
+
+		--no-color)
+			_COLOR="false"
+			_COLOR_OUT="false"
+			_COLOR_ERR="false"
+			;;
+
+		--debug)
+			_DEBUG="true"
+			;;
+
+		--force)
+			_FORCE="true"
+			;;
+
+		-h|--help)
+			Man
+			;;
+
+		--quiet)
+			_QUIET="true"
+			;;
+
+		-u|--usage)
+			Usage --exit
+			;;
+
+		--verbose)
+			_VERBOSE="true"
+			;;
+
+		-v|--version)
+			echo "${VERSION}"
+			exit 0
+			;;
+
+		*)
+			Echo_error "Internal error: Unknown common option '%s'" "${1}"
+			exit 1
+			;;
+	esac
 }

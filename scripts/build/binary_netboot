@@ -1,6 +1,7 @@
 #!/bin/sh
 
 ## live-build(7) - System Build Scripts
+## Copyright (C) 2016-2020 The Debian Live team
 ## Copyright (C) 2006-2015 Daniel Baumann <mail@daniel-baumann.ch>
 ##
 ## This program comes with ABSOLUTELY NO WARRANTY; for details see COPYING.
@@ -14,18 +15,13 @@ set -e
 [ -e "${LIVE_BUILD}/scripts/build.sh" ] && . "${LIVE_BUILD}/scripts/build.sh" || . /usr/lib/live/build.sh
 
 # Setting static variables
-DESCRIPTION="$(Echo 'build netboot binary image')"
-HELP=""
+DESCRIPTION="Build netboot binary image"
 USAGE="${PROGRAM} [--force]"
 
-Arguments "${@}"
+# Processing arguments and configuration files
+Init_config_data "${@}"
 
-# Reading configuration files
-Read_conffiles config/all config/common config/bootstrap config/chroot config/binary config/source
-Set_defaults
-
-if ! In_list netboot "${LIVE_IMAGE_TYPE}"
-then
+if [ "${LB_IMAGE_TYPE}" != "netboot" ]; then
 	exit 0
 fi
 
@@ -37,32 +33,21 @@ fi
 Echo_message "Begin building binary netboot image..."
 
 # Requiring stage file
-Require_stagefile .build/config .build/bootstrap
+Require_stagefiles config bootstrap
 
 # Checking stage file
-Check_stagefile .build/binary_netboot
+Check_stagefile
 
-# Checking lock file
-Check_lockfile .lock
-
-# Creating lock file
-Create_lockfile .lock
+# Acquire lock file
+Acquire_lockfile
 
 # Remove old binary
-rm -f ${LIVE_IMAGE_NAME}-${LB_ARCHITECTURES}.netboot.tar ${LIVE_IMAGE_NAME}-${LB_ARCHITECTURES}.netboot.tar.gz ${LIVE_IMAGE_NAME}-${LB_ARCHITECTURES}.netboot.tar.bz2 ${LIVE_IMAGE_NAME}-${LB_ARCHITECTURES}.netboot.tar.xz ${LIVE_IMAGE_NAME}-${LB_ARCHITECTURES}.netboot.tar.xz
+rm -f ${LB_IMAGE_NAME}-${LB_ARCHITECTURE}.netboot.tar ${LB_IMAGE_NAME}-${LB_ARCHITECTURE}.netboot.tar.gz ${LB_IMAGE_NAME}-${LB_ARCHITECTURE}.netboot.tar.bz2 ${LB_IMAGE_NAME}-${LB_ARCHITECTURE}.netboot.tar.xz ${LB_IMAGE_NAME}-${LB_ARCHITECTURE}.netboot.tar.xz
 
 # Creating image file
-ROOT_DIR=$(basename ${LB_NET_ROOT_PATH})
+ROOT_DIR=${LB_MODE}-live
 
-if [ "${ROOT_DIR}" = "chroot" ]
-then
-	mv chroot chroot.tmp
-fi
-
-if [ "${ROOT_DIR}" != "binary" ]
-then
-	mv binary ${ROOT_DIR}
-fi
+mv binary ${ROOT_DIR}
 
 mkdir binary.tmp
 mv ${ROOT_DIR} tftpboot binary.tmp
@@ -72,23 +57,23 @@ cd binary.tmp
 mkdir tftpboot/live
 mv */live/vmlinuz* */live/initrd* tftpboot/live
 
-tar cf ../${LIVE_IMAGE_NAME}-${LB_ARCHITECTURES}.netboot.tar *
+tar cf ../${LB_IMAGE_NAME}-${LB_ARCHITECTURE}.netboot.tar *
 
 case "${LB_COMPRESSION}" in
 	bzip2)
-		bzip2 ${BZIP2_OPTIONS} ../${LIVE_IMAGE_NAME}-${LB_ARCHITECTURES}.netboot.tar
+		bzip2 ${BZIP2_OPTIONS} ../${LB_IMAGE_NAME}-${LB_ARCHITECTURE}.netboot.tar
 		;;
 
 	gzip)
-		gzip ${GZIP_OPTIONS} ../${LIVE_IMAGE_NAME}-${LB_ARCHITECTURES}.netboot.tar
+		gzip ${GZIP_OPTIONS} ../${LB_IMAGE_NAME}-${LB_ARCHITECTURE}.netboot.tar
 		;;
 
 	lzip)
-		lzip ${LZIP_OPTIONS} ../${LIVE_IMAGE_NAME}-${LB_ARCHITECTURES}.netboot.tar
+		lzip ${LZIP_OPTIONS} ../${LB_IMAGE_NAME}-${LB_ARCHITECTURE}.netboot.tar
 		;;
 
 	xz)
-		xz ${XZ_OPTIONS} ../${LIVE_IMAGE_NAME}-${LB_ARCHITECTURES}.netboot.tar
+		xz ${XZ_OPTIONS} ../${LB_IMAGE_NAME}-${LB_ARCHITECTURE}.netboot.tar
 		;;
 
 	none)
@@ -99,15 +84,7 @@ mv * ../
 cd "${OLDPWD}"
 rmdir binary.tmp
 
-if [ "${ROOT_DIR}" != "binary" ]
-then
-	mv ${ROOT_DIR} binary
-fi
-
-if [ "${ROOT_DIR}" = "chroot" ]
-then
-	mv chroot.tmp chroot
-fi
+mv ${ROOT_DIR} binary
 
 # Creating stage file
-Create_stagefile .build/binary_netboot
+Create_stagefile

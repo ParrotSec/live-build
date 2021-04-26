@@ -1,6 +1,7 @@
 #!/bin/sh
 
 ## live-build(7) - System Build Scripts
+## Copyright (C) 2016-2020 The Debian Live team
 ## Copyright (C) 2006-2015 Daniel Baumann <mail@daniel-baumann.ch>
 ##
 ## This program comes with ABSOLUTELY NO WARRANTY; for details see COPYING.
@@ -14,9 +15,8 @@ set -e
 [ -e "${LIVE_BUILD}/scripts/build.sh" ] && . "${LIVE_BUILD}/scripts/build.sh" || . /usr/lib/live/build.sh
 
 # Setting static variables
-PROGRAM="lb config"
-DESCRIPTION="$(Echo 'create configuration for live-build(7)')"
-USAGE="${PROGRAM}   [--apt apt|aptitude]\n\
+DESCRIPTION="Create configuration for live-build(7)"
+USAGE="${PROGRAM} [--apt apt|apt-get|aptitude]\n\
 \t    [--apt-ftp-proxy URL]\n\
 \t    [--apt-http-proxy URL]\n\
 \t    [--apt-indices true|false]\n\
@@ -26,17 +26,17 @@ USAGE="${PROGRAM}   [--apt apt|aptitude]\n\
 \t    [--apt-secure true|false]\n\
 \t    [--apt-source-archives true|false]\n\
 \t    [--aptitude-options OPTION|\"OPTIONS\"]\n\
-\t    [-a|--architectures ARCHITECTURE]\n\
+\t    [-a|--architecture ARCHITECTURE]\n\
 \t    [--archive-areas ARCHIVE_AREA|\"ARCHIVE_AREAS\"]\n\
 \t    [--backports true|false]\n\
 \t    [--binary-filesystem fat16|fat32|ext2|ext3|ext4|ntfs]\n\
-\t    [-b|--binary-images iso|iso-hybrid|netboot|tar|hdd]\n\
+\t    [-b|--binary-image iso|iso-hybrid|netboot|tar|hdd]\n\
 \t    [--bootappend-install PARAMETER|\"PARAMETERS\"]\n\
 \t    [--bootappend-live PARAMETER|\"PARAMETERS\"]\n\
 \t    [--bootappend-live-failsafe PARAMETER|\"PARAMETERS\"]\n\
-\t    [--bootloaders grub-legacy|grub-pc|syslinux|grub-efi]\n\
+\t    [--bootloaders grub-legacy|grub-pc|syslinux|grub-efi|\"BOOTLOADERS\"]\n\
 \t    [--bootstrap-qemu-arch ARCH]\n\
-\t    [--bootstrap-qemu-exclude PACKAGES]\n\
+\t    [--bootstrap-qemu-exclude PACKAGE|\"PACKAGES\"]\n\
 \t    [--bootstrap-qemu-static PATH]\n\
 \t    [--breakpoints]\n\
 \t    [--build-with-chroot true|false]\n\
@@ -46,6 +46,8 @@ USAGE="${PROGRAM}   [--apt apt|aptitude]\n\
 \t    [--cache-stages STAGE|\"STAGES\"]\n\
 \t    [--checksums md5|sha1|sha224|sha256|sha384|sha512|none]\n\
 \t    [--chroot-filesystem ext2|ext3|ext4|squashfs|jffs2|none]\n\
+\t    [--chroot-squashfs-compression-level LEVEL]\n\
+\t    [--chroot-squashfs-compression-type gzip|lzma|lzo|lz4|xz|zstd]\n\
 \t    [--clean]\n\
 \t    [--color]\n\
 \t    [--compression bzip2|gzip|lzip|xz|none]\n\
@@ -53,22 +55,20 @@ USAGE="${PROGRAM}   [--apt apt|aptitude]\n\
 \t    [--config GIT_URL::GIT_BRANCH]\n\
 \t    [--debconf-frontend dialog|editor|noninteractive|readline]\n\
 \t    [--debconf-priority low|medium|high|critical]\n\
-\t    [--debian-installer true|cdrom|netinst|netboot|businesscard|live|false]\n\
+\t    [--debian-installer cdrom|netinst|netboot|businesscard|live|none]\n\
 \t    [--debian-installer-distribution daily|CODENAME]\n\
 \t    [--debian-installer-gui true|false]\n\
 \t    [--debian-installer-preseedfile FILE|URL]\n\
-\t    [--debootstrap-options OPTIONS]\n\
+\t    [--debootstrap-options OPTION|\"OPTIONS\"]\n\
 \t    [--debootstrap-script SCRIPT]\n\
 \t    [--debug]\n\
 \t    [-d|--distribution CODENAME]\n\
 \t    [--distribution-binary CODENAME]\n\
 \t    [--distribution-chroot CODENAME]\n\
 \t    [--dump]\n\
-\t    [--fdisk fdisk|fdisk.dist]\n\
 \t    [--firmware-binary true|false]\n\
 \t    [--firmware-chroot true|false]\n\
 \t    [--force]\n\
-\t    [--grub-splash FILE]\n\
 \t    [--gzip-options OPTION|\"OPTIONS\"]\n\
 \t    [--hdd-label LABEL]\n\
 \t    [--hdd-partition-start START]\n\
@@ -78,18 +78,16 @@ USAGE="${PROGRAM}   [--apt apt|aptitude]\n\
 \t    [--initramfs none|live-boot]\n\
 \t    [--initramfs-compression bzip2|gzip|lzma]\n\
 \t    [--initsystem sysvinit|systemd|none]\n\
-\t    [--interactive shell]\n\
+\t    [--interactive true|shell|x11|xnest|false]\n\
 \t    [--iso-application NAME]\n\
 \t    [--iso-preparer NAME]\n\
 \t    [--iso-publisher NAME]\n\
 \t    [--iso-volume NAME]\n\
-\t    [--isohybrid-options OPTION|\"OPTIONS\"]\n\
 \t    [--jffs2-eraseblock SIZE]\n\
 \t    [--keyring-packages PACKAGE|\"PACKAGES\"]\n\
 \t    [-k|--linux-flavours FLAVOUR|\"FLAVOURS\"]\n\
-\t    [--linux-packages \"PACKAGES\"]\n\
+\t    [--linux-packages PACKAGE|\"PACKAGES\"]\n\
 \t    [--loadlin true|false]\n\
-\t    [--losetup losetup|losetup.orig]\n\
 \t    [--memtest memtest86+|memtest86|none]\n\
 \t    [--mirror-binary URL]\n\
 \t    [--mirror-binary-security URL]\n\
@@ -97,18 +95,12 @@ USAGE="${PROGRAM}   [--apt apt|aptitude]\n\
 \t    [--mirror-chroot URL]\n\
 \t    [--mirror-chroot-security URL]\n\
 \t    [--mirror-debian-installer URL]\n\
-\t    [--mode debian|progress-linux]\n\
-\t    [--net-cow-filesystem nfs|cfs]\n\
-\t    [--net-cow-mountoptions OPTIONS]\n\
-\t    [--net-cow-path PATH]\n\
-\t    [--net-cow-server IP|HOSTNAME]\n\
-\t    [--net-root-filesystem nfs|cfs]\n\
-\t    [--net-root-mountoptions OPTIONS]\n\
+\t    [--mode debian]\n\
 \t    [--net-root-path PATH]\n\
-\t    [--net-root-server IP|HOSTNAME]\n\
 \t    [--net-tarball true|false]\n\
+\t    [--no-color]\n\
 \t    [--onie true|false]\n\
-\t    [--onie-kernel-cmdline \"OPTION1 OPTION2\"]\n\
+\t    [--onie-kernel-cmdline OPTION|\"OPTIONS\"]\n\
 \t    [--parent-archive-areas ARCHIVE_AREA|\"ARCHIVE_AREAS\"]\n\
 \t    [--parent-debian-installer-distribution CODENAME]\n\
 \t    [--parent-distribution CODENAME]\n\
@@ -127,9 +119,10 @@ USAGE="${PROGRAM}   [--apt apt|aptitude]\n\
 \t    [--swap-file-path PATH]\n\
 \t    [--swap-file-size MB]\n\
 \t    [--system live|normal]\n\
-\t    [--tasksel apt|aptitude|tasksel]\n\
 \t    [--uefi-secure-boot auto|enable|disable]\n\
 \t    [--updates true|false]\n\
+\t    [--utc-time true|false]\n\
+\t    [--validate]\n\
 \t    [--verbose]\n\
 \t    [--win32-loader true|false]\n\
 \t    [--zsync true|false]"
@@ -137,38 +130,62 @@ USAGE="${PROGRAM}   [--apt apt|aptitude]\n\
 
 Local_arguments ()
 {
-	LONG_OPTIONS="apt:,apt-ftp-proxy:,apt-http-proxy:,apt-options:,aptitude-options:,debootstrap-options:,debootstrap-script:,
-		apt-pipeline:,apt-recommends:,apt-secure:,apt-source-archives:,cache:,cache-indices:,cache-packages:,
-		cache-stages:,debconf-frontend:,debconf-priority:,dump,
-		initramfs:,initramfs-compression:,initsystem:,fdisk:,losetup:,mode:,system:,tasksel:,
-		architectures:,clean,
-		distribution:,parent-distribution:,parent-debian-installer-distribution:,
-		distribution-chroot:,parent-distribution-chroot:,
-		distribution-binary:,parent-distribution-binary:,
-		parent-mirror-bootstrap:,parent-mirror-chroot:,parent-mirror-chroot-security:,parent-mirror-binary:,
-		parent-mirror-binary-security:,parent-mirror-debian-installer:,
-		mirror-bootstrap:,mirror-chroot:,mirror-chroot-security:,mirror-binary:,
-		mirror-binary-security:,mirror-debian-installer:,
-		archive-areas:,parent-archive-areas:,chroot-filesystem:,
-		gzip-options:,image-name:,interactive:,keyring-packages:,linux-flavours:,linux-packages:,
-		security:,updates:,backports:,binary-filesystem:,binary-images:,
-		apt-indices:,bootappend-install:,bootappend-live:,bootappend-live-failsafe:,bootloader:,bootloaders:,checksums:,compression:,config:,zsync:,build-with-chroot:,
-		debian-installer:,debian-installer-distribution:,debian-installer-preseedfile:,debian-installer-gui:,
-		grub-splash:,isohybrid-options:,hdd-label:,hdd-size:,hdd-partition-start:,iso-application:,iso-preparer:,iso-publisher:,
-		iso-volume:,jffs2-eraseblock:,memtest:,net-root-filesystem:,net-root-mountoptions:,
-		net-root-path:,net-root-server:,net-cow-filesystem:,net-cow-mountoptions:,net-cow-path:,
-		net-cow-server:,net-tarball:,onie:,onie-kernel-cmdline:,firmware-binary:,firmware-chroot:,swap-file-path:,swap-file-size:,
-		loadlin:,win32-loader:,source:,source-images:,breakpoints,conffile:,color,debug,force,
-		help,ignore-system-defaults,quiet,usage,verbose,version,bootstrap-qemu-static:,bootstrap-qemu-arch:,
-		uefi-secure-boot:,
-		bootstrap-qemu-exclude:"
+	local LONG_OPTIONS
+	LONG_OPTIONS="
+		apt:,apt-ftp-proxy:,apt-http-proxy:,apt-indices:,aptitude-options:,
+		apt-options:,apt-pipeline:,apt-recommends:,apt-secure:,
+		apt-source-archives:,architecture:,architectures:,archive-areas:,
+		backports:,binary-filesystem:,binary-image:,binary-images:,
+		bootappend-install:,bootappend-live:,bootappend-live-failsafe:,
+		bootloader:,bootloaders:,bootstrap-qemu-arch:,bootstrap-qemu-exclude:,
+		bootstrap-qemu-static:,breakpoints,build-with-chroot:,
+		cache:,cache-indices:,cache-packages:,cache-stages:,checksums:,
+		chroot-filesystem:,chroot-squashfs-compression-level:,
+		chroot-squashfs-compression-type:,clean,color,compression:,conffile:,
+		config:,debconf-frontend:,debconf-priority:,debian-installer:,
+		debian-installer-distribution:,debian-installer-gui:,
+		debian-installer-preseedfile:,debootstrap-options:,debootstrap-script:,
+		debug,distribution:,distribution-binary:,distribution-chroot:,dump,
+		fdisk:,firmware-binary:,firmware-chroot:,force,
+		grub-splash:,gzip-options:,
+		hdd-label:,hdd-partition-start:,hdd-size:,help,
+		ignore-system-defaults,image-name:,initramfs:,initramfs-compression:,
+		initsystem:,interactive:,iso-application:,isohybrid-options:,
+		iso-preparer:,iso-publisher:,iso-volume:,
+		jffs2-eraseblock:,
+		keyring-packages:,
+		linux-flavours:,linux-packages:,loadlin:,losetup:,
+		memtest:,mirror-binary:,mirror-binary-security:,mirror-bootstrap:,
+		mirror-chroot:,mirror-chroot-security:,mirror-debian-installer:,mode:,
+		net-cow-filesystem:,net-cow-mountoptions:,net-cow-path:,
+		net-cow-server:,net-root-filesystem:,net-root-mountoptions:,
+		net-root-path:,net-root-server:,net-tarball:,no-color,
+		onie:,onie-kernel-cmdline:,
+		parent-archive-areas:,parent-debian-installer-distribution:,
+		parent-distribution:,parent-distribution-binary:,
+		parent-distribution-chroot:,parent-mirror-binary:,
+		parent-mirror-binary-security:,parent-mirror-bootstrap:,
+		parent-mirror-chroot:,parent-mirror-chroot-security:,
+		parent-mirror-debian-installer:,
+		quiet,
+		security:,source:,source-images:,swap-file-path:,swap-file-size:,system:,
+		tasksel:,
+		uefi-secure-boot:,updates:,utc-time:,usage,
+		validate,verbose,version,
+		win32-loader:,
+		zsync:"
 	# Remove spaces added by indentation
 	LONG_OPTIONS="$(echo ${LONG_OPTIONS} | tr -d ' ')"
-	ARGUMENTS="$(getopt --longoptions ${LONG_OPTIONS} --name="${PROGRAM}" --options a:d:m:k:b:s:c:huv --shell sh -- "${@}")"
 
-	if [ "${?}" != "0" ]
-	then
-		Echo_error "terminating" >&2
+	local ARGUMENTS
+	local ERR=0
+	ARGUMENTS="$(getopt --longoptions ${LONG_OPTIONS} --name="${PROGRAM}" --options a:d:m:k:b:s:c:huv --shell sh -- "${@}")" || ERR=$?
+
+	if [ $ERR -eq 1 ]; then
+		Echo_error "invalid arguments"
+		exit 1
+	elif [ $ERR -ne 0 ]; then
+		Echo_error "getopt failure"
 		exit 1
 	fi
 
@@ -177,19 +194,36 @@ Local_arguments ()
 	while true
 	do
 		case "${1}" in
+
+			# Config script specific options
+
+			--clean)
+				_CLEAN="true"
+				shift
+				;;
+
+			--config)
+				_CONFIG="${2}"
+				shift 2
+				;;
+
+			-c|--conffile)
+				_CONFFILE="${2}"
+				shift 2
+				;;
+
 			--dump)
 				# Dump version
-				if [ -x "$(which dpkg-query 2>/dev/null)" ]
-				then
-					VERSION_DPKG="$(dpkg-query -f='${Version}' --show live-build)"
+				Echo "This is live-build version %s" "${VERSION}"
+				if command -v dpkg-query >/dev/null; then
+					Echo "Installed version reported by dpkg is %s" "$(dpkg-query -f='${Version}' --show live-build)"
 				fi
 
-				Echo "%s: This is live-build version %s" "${0}" "${VERSION_DPKG:-${VERSION}}"
-
 				# Dump conffile contents
-				Print_conffiles config/all config/common config/bootstrap config/chroot config/binary config/source
+				Print_conffiles $(Common_conffiles)
 
 				# Dump contents of directories that contain text files
+				local DIRECTORY
 				for DIRECTORY in config/package-lists config/apt config/preseed config/rootfs
 				do
 					if Find_files "${DIRECTORY}"
@@ -213,12 +247,35 @@ Local_arguments ()
 				exit 0
 				;;
 
-			--clean)
-				_CLEAN="true"
+			--ignore-system-defaults)
+				_IGNORE_SYSTEM_DEFAULTS="true"
 				shift
 				;;
 
-			# config/common
+			--validate)
+				_VALIDATE_MODE="true"
+				shift
+				;;
+
+			# General options
+
+			--breakpoints|--debug|--force|-h|--help|--quiet|-u|--usage|--verbose|-v|--version)
+				Handle_common_option "${1}"
+				shift
+				;;
+
+			--color)
+				_COLOR="true"
+				shift
+				;;
+
+			--no-color)
+				_COLOR="false"
+				shift
+				;;
+
+			# Build config options
+
 			--apt)
 				LB_APT="${2}"
 				shift 2
@@ -244,11 +301,6 @@ Local_arguments ()
 				shift 2
 				;;
 
-			--aptitude-options)
-				APTITUDE_OPTIONS="${2}"
-				shift 2
-				;;
-
 			--apt-pipeline)
 				LB_APT_PIPELINE="${2}"
 				shift 2
@@ -269,13 +321,74 @@ Local_arguments ()
 				shift 2
 				;;
 
-			--debootstrap-options)
-				DEBOOTSTRAP_OPTIONS="${2}"
+			--aptitude-options)
+				APTITUDE_OPTIONS="${2}"
 				shift 2
 				;;
 
-			--debootstrap-script)
-				DEBOOTSTRAP_SCRIPT="${2}"
+			-a|--architecture|--architectures)
+				LB_ARCHITECTURE="${2}"
+				shift 2
+				;;
+
+			--archive-areas)
+				LB_ARCHIVE_AREAS="${2}"
+				shift 2
+				;;
+
+			--backports)
+				LB_BACKPORTS="${2}"
+				shift 2
+				;;
+
+			--binary-filesystem)
+				LB_BINARY_FILESYSTEM="${2}"
+				shift 2
+				;;
+
+			-b|--binary-image|--binary-images)
+				LB_IMAGE_TYPE="${2}"
+				shift 2
+				;;
+
+			--bootappend-install)
+				LB_BOOTAPPEND_INSTALL="${2}"
+				shift 2
+				;;
+
+			--bootappend-live)
+				LB_BOOTAPPEND_LIVE="${2}"
+				shift 2
+				;;
+
+			--bootappend-live-failsafe)
+				LB_BOOTAPPEND_LIVE_FAILSAFE="${2}"
+				shift 2
+				;;
+
+			--bootloaders|--bootloader)
+				# This will be split up into BIOS and EFI selections by `Prepare_config()`
+				LB_BOOTLOADERS="${2}"
+				shift 2
+				;;
+
+			--bootstrap-qemu-arch)
+				LB_BOOTSTRAP_QEMU_ARCHITECTURE="${2}"
+				shift 2
+				;;
+
+			--bootstrap-qemu-exclude)
+				LB_BOOTSTRAP_QEMU_EXCLUDE="${2}"
+				shift 2
+				;;
+
+			--bootstrap-qemu-static)
+				LB_BOOTSTRAP_QEMU_STATIC="${2}"
+				shift 2
+				;;
+
+			--build-with-chroot)
+				LB_BUILD_WITH_CHROOT="${2}"
 				shift 2
 				;;
 
@@ -299,6 +412,31 @@ Local_arguments ()
 				shift 2
 				;;
 
+			--checksums)
+				LB_CHECKSUMS="${2}"
+				shift 2
+				;;
+
+			--chroot-filesystem)
+				LB_CHROOT_FILESYSTEM="${2}"
+				shift 2
+				;;
+
+			--chroot-squashfs-compression-level)
+				LB_CHROOT_SQUASHFS_COMPRESSION_LEVEL="${2}"
+				shift 2
+				;;
+
+			--chroot-squashfs-compression-type)
+				LB_CHROOT_SQUASHFS_COMPRESSION_TYPE="${2}"
+				shift 2
+				;;
+
+			--compression)
+				LB_COMPRESSION="${2}"
+				shift 2
+				;;
+
 			--debconf-frontend)
 				LB_DEBCONF_FRONTEND="${2}"
 				shift 2
@@ -306,6 +444,96 @@ Local_arguments ()
 
 			--debconf-priority)
 				LB_DEBCONF_PRIORITY="${2}"
+				shift 2
+				;;
+
+			--debian-installer)
+				LB_DEBIAN_INSTALLER="${2}"
+				shift 2
+				;;
+
+			--debian-installer-distribution)
+				LB_DEBIAN_INSTALLER_DISTRIBUTION="${2}"
+				shift 2
+				;;
+
+			--debian-installer-gui)
+				LB_DEBIAN_INSTALLER_GUI="${2}"
+				shift 2
+				;;
+
+			--debian-installer-preseedfile)
+				LB_DEBIAN_INSTALLER_PRESEEDFILE="${2}"
+				shift 2
+				;;
+
+			--debootstrap-options)
+				DEBOOTSTRAP_OPTIONS="${2}"
+				shift 2
+				;;
+
+			--debootstrap-script)
+				DEBOOTSTRAP_SCRIPT="${2}"
+				shift 2
+				;;
+
+			-d|--distribution)
+				LB_DISTRIBUTION="${2}"
+				shift 2
+				;;
+
+			--distribution-binary)
+				LB_DISTRIBUTION_BINARY="${2}"
+				shift 2
+				;;
+
+			--distribution-chroot)
+				LB_DISTRIBUTION_CHROOT="${2}"
+				shift 2
+				;;
+
+			--fdisk)
+				Echo_warning "--fdisk is an obsolete option"
+				shift 2
+				;;
+
+			--firmware-binary)
+				LB_FIRMWARE_BINARY="${2}"
+				shift 2
+				;;
+
+			--firmware-chroot)
+				LB_FIRMWARE_CHROOT="${2}"
+				shift 2
+				;;
+
+			--grub-splash)
+				Echo_warning "--grub-splash is an obsolete option"
+				shift 2
+				;;
+
+			--gzip-options)
+				GZIP_OPTIONS="${2}"
+				shift 2
+				;;
+
+			--hdd-label)
+				LB_HDD_LABEL="${2}"
+				shift 2
+				;;
+
+			--hdd-partition-start)
+				LB_HDD_PARTITION_START="${2}"
+				shift 2
+				;;
+
+			--hdd-size)
+				LB_HDD_SIZE="${2}"
+				shift 2
+				;;
+
+			--image-name)
+				LB_IMAGE_NAME="${2}"
 				shift 2
 				;;
 
@@ -324,291 +552,8 @@ Local_arguments ()
 				shift 2
 				;;
 
-			--fdisk)
-				LB_FDISK="${2}"
-				shift 2
-				;;
-
-			--losetup)
-				LB_LOSETUP="${2}"
-				shift 2
-				;;
-
-			--mode)
-				LB_MODE="${2}"
-				shift 2
-				;;
-
-			--system)
-				LB_SYSTEM="${2}"
-				shift 2
-				;;
-
-			--tasksel)
-				LB_TASKSEL="${2}"
-				shift 2
-				;;
-
-			# config/bootstrap
-			-a|--architectures)
-				LB_ARCHITECTURES="${2}"
-				shift 2
-				;;
-
-			-d|--distribution)
-				LB_DISTRIBUTION="${2}"
-				shift 2
-				;;
-
-			--parent-distribution)
-				LB_PARENT_DISTRIBUTION="${2}"
-				shift 2
-				;;
-
-			--distribution-chroot)
-				LB_DISTRIBUTION_CHROOT="${2}"
-				shift 2
-				;;
-
-			--parent-distribution-chroot)
-				LB_PARENT_DISTRIBUTION_CHROOT="${2}"
-				shift 2
-				;;
-
-			--distribution-binary)
-				LB_DISTRIBUTION_BINARY="${2}"
-				shift 2
-				;;
-
-			--parent-distribution-binary)
-				LB_PARENT_DISTRIBUTION_BINARY="${2}"
-				shift 2
-				;;
-
-			-m|--parent-mirror-bootstrap)
-				LB_PARENT_MIRROR_BOOTSTRAP="${2}"
-				shift 2
-				;;
-
-			--parent-mirror-chroot)
-				LB_PARENT_MIRROR_CHROOT="${2}"
-				shift 2
-				;;
-
-			--parent-mirror-chroot-security)
-				LB_PARENT_MIRROR_CHROOT_SECURITY="${2}"
-				shift 2
-				;;
-
-			--parent-mirror-binary)
-				LB_PARENT_MIRROR_BINARY="${2}"
-				shift 2
-				;;
-
-			--parent-mirror-binary-security)
-				LB_PARENT_MIRROR_BINARY_SECURITY="${2}"
-				shift 2
-				;;
-
-			--parent-mirror-debian-installer)
-				LB_PARENT_MIRROR_DEBIAN_INSTALLER="${2}"
-				shift 2
-				;;
-
-			--mirror-bootstrap)
-				LB_MIRROR_BOOTSTRAP="${2}"
-				shift 2
-				;;
-
-			--mirror-chroot)
-				LB_MIRROR_CHROOT="${2}"
-				shift 2
-				;;
-
-			--mirror-chroot-security)
-				LB_MIRROR_CHROOT_SECURITY="${2}"
-				shift 2
-				;;
-
-			--mirror-binary)
-				LB_MIRROR_BINARY="${2}"
-				shift 2
-				;;
-
-			--mirror-binary-security)
-				LB_MIRROR_BINARY_SECURITY="${2}"
-				shift 2
-				;;
-
-			--mirror-debian-installer)
-				LB_MIRROR_DEBIAN_INSTALLER="${2}"
-				shift 2
-				;;
-
-			--archive-areas)
-				LB_ARCHIVE_AREAS="${2}"
-				shift 2
-				;;
-
-			--parent-archive-areas)
-				LB_PARENT_ARCHIVE_AREAS="${2}"
-				shift 2
-				;;
-
-			# config/chroot
-			--chroot-filesystem)
-				LB_CHROOT_FILESYSTEM="${2}"
-				shift 2
-				;;
-
-			--gzip-options)
-				GZIP_OPTIONS="${2}"
-				shift 2
-				;;
-
-			--image-name)
-				LIVE_IMAGE_NAME="${2}"
-				shift 2
-				;;
-
 			--interactive)
 				LB_INTERACTIVE="${2}"
-				shift 2
-				;;
-
-			--keyring-packages)
-				LB_KEYRING_PACKAGES="${2}"
-				shift 2
-				;;
-
-			-k|--linux-flavours)
-				LB_LINUX_FLAVOURS_WITH_ARCH="${2}"
-				shift 2
-				;;
-
-			--linux-packages)
-				LB_LINUX_PACKAGES="${2}"
-				shift 2
-				;;
-
-			--security)
-				LB_SECURITY="${2}"
-				shift 2
-				;;
-
-			--updates)
-				LB_UPDATES="${2}"
-				shift 2
-				;;
-
-			--backports)
-				LB_BACKPORTS="${2}"
-				shift 2
-				;;
-
-			# config/binary
-			--binary-filesystem)
-				LB_BINARY_FILESYSTEM="${2}"
-				shift 2
-				;;
-
-			-b|--binary-images)
-				LIVE_IMAGE_TYPE="${2}"
-				shift 2
-				;;
-
-			--bootappend-live)
-				LB_BOOTAPPEND_LIVE="${2}"
-				shift 2
-				;;
-
-			--bootappend-live-failsafe)
-				LB_BOOTAPPEND_LIVE_FAILSAFE="${2}"
-				shift 2
-				;;
-
-			--bootappend-install)
-				LB_BOOTAPPEND_INSTALL="${2}"
-				shift 2
-				;;
-
-			--bootloaders|--bootloader)
-				LB_BOOTLOADERS="${2}"
-				shift 2
-				;;
-
-			--checksums)
-				LB_CHECKSUMS="${2}"
-				shift 2
-				;;
-
-			--compression)
-				LB_COMPRESSION="${2}"
-				shift 2
-				;;
-
-			--config)
-				_CONFIG="${2}"
-				shift 2
-				;;
-
-			--zsync)
-				LB_ZSYNC="${2}"
-				shift 2
-				;;
-
-			--build-with-chroot)
-				LB_BUILD_WITH_CHROOT="${2}"
-				shift 2
-				;;
-
-			--debian-installer)
-				LB_DEBIAN_INSTALLER="${2}"
-				shift 2
-				;;
-
-			--debian-installer-distribution)
-				LB_DEBIAN_INSTALLER_DISTRIBUTION="${2}"
-				shift 2
-				;;
-
-			--parent-debian-installer-distribution)
-				LB_PARENT_DEBIAN_INSTALLER_DISTRIBUTION="${2}"
-				shift 2
-				;;
-
-			--debian-installer-preseedfile)
-				LB_DEBIAN_INSTALLER_PRESEEDFILE="${2}"
-				shift 2
-				;;
-
-			--debian-installer-gui)
-				LB_DEBIAN_INSTALLER_GUI="${2}"
-				shift 2
-				;;
-
-			--grub-splash)
-				LB_GRUB_SPLASH="${2}"
-				shift 2
-				;;
-
-			--isohybrid-options)
-				LB_ISOHYBRID_OPTIONS="${2}"
-				shift 2
-				;;
-
-			--hdd-label)
-				LB_HDD_LABEL="${2}"
-				shift 2
-				;;
-
-			--hdd-size)
-				LB_HDD_SIZE="${2}"
-				shift 2
-				;;
-
-			--hdd-partition-start)
-				LB_HDD_PARTITION_START="${2}"
 				shift 2
 				;;
 
@@ -632,8 +577,38 @@ Local_arguments ()
 				shift 2
 				;;
 
+			--isohybrid-options)
+				Echo_warning "--isohybrid-options is an obsolete option"
+				shift 2
+				;;
+
 			--jffs2-eraseblock)
 				LB_JFFS2_ERASEBLOCK="${2}"
+				shift 2
+				;;
+
+			--keyring-packages)
+				LB_KEYRING_PACKAGES="${2}"
+				shift 2
+				;;
+
+			-k|--linux-flavours)
+				LB_LINUX_FLAVOURS_WITH_ARCH="${2}"
+				shift 2
+				;;
+
+			--linux-packages)
+				LB_LINUX_PACKAGES="${2}"
+				shift 2
+				;;
+
+			--loadlin)
+				LB_LOADLIN="${2}"
+				shift 2
+				;;
+
+			--losetup)
+				Echo_warning "--losetup is an obsolete option"
 				shift 2
 				;;
 
@@ -642,43 +617,78 @@ Local_arguments ()
 				shift 2
 				;;
 
-			--net-root-filesystem)
-				LB_NET_ROOT_FILESYSTEM="${2}"
+			--mirror-binary)
+				LB_MIRROR_BINARY="${2}"
 				shift 2
 				;;
 
-			--net-root-mountoptions)
-				LB_NET_ROOT_MOUNTOPTIONS="${2}"
+			--mirror-binary-security)
+				LB_MIRROR_BINARY_SECURITY="${2}"
 				shift 2
 				;;
 
-			--net-root-path)
-				LB_NET_ROOT_PATH="${2}"
+			--mirror-bootstrap)
+				LB_MIRROR_BOOTSTRAP="${2}"
 				shift 2
 				;;
 
-			--net-root-server)
-				LB_NET_ROOT_SERVER="${2}"
+			--mirror-chroot)
+				LB_MIRROR_CHROOT="${2}"
+				shift 2
+				;;
+
+			--mirror-chroot-security)
+				LB_MIRROR_CHROOT_SECURITY="${2}"
+				shift 2
+				;;
+
+			--mirror-debian-installer)
+				LB_MIRROR_DEBIAN_INSTALLER="${2}"
+				shift 2
+				;;
+
+			--mode)
+				LB_MODE="${2}"
 				shift 2
 				;;
 
 			--net-cow-filesystem)
-				LB_NET_COW_FILESYSTEM="${2}"
+				Echo_warning "--net-cow-filesystem is an obsolete option"
 				shift 2
 				;;
 
 			--net-cow-mountoptions)
-				LB_NET_COW_MOUNTOPTIONS="${2}"
+				Echo_warning "--net-cow-mountoptions is an obsolete option"
 				shift 2
 				;;
 
 			--net-cow-path)
-				LB_NET_COW_PATH="${2}"
+				Echo_warning "--net-cow-path is an obsolete option"
 				shift 2
 				;;
 
 			--net-cow-server)
-				LB_NET_COW_SERVER="${2}"
+				Echo_warning "--net-cow-server is an obsolete option"
+				shift 2
+				;;
+
+			--net-root-filesystem)
+				Echo_warning "--net-root-filesystem is an obsolete option"
+				shift 2
+				;;
+
+			--net-root-mountoptions)
+				Echo_warning "--net-root-mountoptions is an obsolete option"
+				shift 2
+				;;
+
+			--net-root-path)
+				Echo_warning "--net-root-path is an obsolete option"
+				shift 2
+				;;
+
+			--net-root-server)
+				Echo_warning "--net-root-server is an obsolete option"
 				shift 2
 				;;
 
@@ -697,13 +707,73 @@ Local_arguments ()
 				shift 2
 				;;
 
-			--firmware-binary)
-				LB_FIRMWARE_BINARY="${2}"
+			--parent-archive-areas)
+				LB_PARENT_ARCHIVE_AREAS="${2}"
 				shift 2
 				;;
 
-			--firmware-chroot)
-				LB_FIRMWARE_CHROOT="${2}"
+			--parent-debian-installer-distribution)
+				LB_PARENT_DEBIAN_INSTALLER_DISTRIBUTION="${2}"
+				shift 2
+				;;
+
+			--parent-distribution)
+				LB_PARENT_DISTRIBUTION="${2}"
+				shift 2
+				;;
+
+			--parent-distribution-binary)
+				LB_PARENT_DISTRIBUTION_BINARY="${2}"
+				shift 2
+				;;
+
+			--parent-distribution-chroot)
+				LB_PARENT_DISTRIBUTION_CHROOT="${2}"
+				shift 2
+				;;
+
+			--parent-mirror-binary)
+				LB_PARENT_MIRROR_BINARY="${2}"
+				shift 2
+				;;
+
+			--parent-mirror-binary-security)
+				LB_PARENT_MIRROR_BINARY_SECURITY="${2}"
+				shift 2
+				;;
+
+			-m|--parent-mirror-bootstrap)
+				LB_PARENT_MIRROR_BOOTSTRAP="${2}"
+				shift 2
+				;;
+
+			--parent-mirror-chroot)
+				LB_PARENT_MIRROR_CHROOT="${2}"
+				shift 2
+				;;
+
+			--parent-mirror-chroot-security)
+				LB_PARENT_MIRROR_CHROOT_SECURITY="${2}"
+				shift 2
+				;;
+
+			--parent-mirror-debian-installer)
+				LB_PARENT_MIRROR_DEBIAN_INSTALLER="${2}"
+				shift 2
+				;;
+
+			--security)
+				LB_SECURITY="${2}"
+				shift 2
+				;;
+
+			--source)
+				LB_SOURCE="${2}"
+				shift 2
+				;;
+
+			-s|--source-images)
+				LB_SOURCE_IMAGES="${2}"
 				shift 2
 				;;
 
@@ -717,13 +787,28 @@ Local_arguments ()
 				shift 2
 				;;
 
+			--system)
+				LB_SYSTEM="${2}"
+				shift 2
+				;;
+
+			--tasksel)
+				Echo_warning "--tasksel is an obsolete option"
+				shift 2
+				;;
+
 			--uefi-secure-boot)
 				LB_UEFI_SECURE_BOOT="${2}"
 				shift 2
 				;;
 
-			--loadlin)
-				LB_LOADLIN="${2}"
+			--updates)
+				LB_UPDATES="${2}"
+				shift 2
+				;;
+
+			--utc-time)
+				LB_UTC_TIME="${2}"
 				shift 2
 				;;
 
@@ -732,86 +817,12 @@ Local_arguments ()
 				shift 2
 				;;
 
-			--bootstrap-qemu-arch)
-				LB_BOOTSTRAP_QEMU_ARCHITECTURES="${2}"
+			--zsync)
+				LB_ZSYNC="${2}"
 				shift 2
 				;;
 
-			--bootstrap-qemu-exclude)
-				LB_BOOTSTRAP_QEMU_EXCLUDE="${2}"
-				shift 2
-				;;
-
-			--bootstrap-qemu-static)
-				LB_BOOTSTRAP_QEMU_STATIC="${2}"
-				shift 2
-				;;
-
-			# config/source
-			--source)
-				LB_SOURCE="${2}"
-				shift 2
-				;;
-
-			-s|--source-images)
-				LB_SOURCE_IMAGES="${2}"
-				shift 2
-				;;
-
-			# other
-			--breakpoints)
-				_BREAKPOINTS="true"
-				shift
-				;;
-
-			-c|--conffile)
-				_CONFFILE="${2}"
-				shift 2
-				;;
-
-			--color)
-				_COLOR="true"
-				shift
-				;;
-
-			--debug)
-				_DEBUG="true"
-				shift
-				;;
-
-			--force)
-				_FORCE="true"
-				shift
-				;;
-
-			-h|--help)
-				Help
-				shift
-				;;
-
-			--ignore-system-defaults)
-				shift
-				;;
-
-			--quiet)
-				_QUIET="true"
-				shift
-				;;
-
-			-u|--usage)
-				Usage
-				shift
-				;;
-
-			--verbose)
-				_VERBOSE="true"
-				shift
-				;;
-
-			-v|--version)
-				echo "${VERSION}"
-				exit 0
-				;;
+			# Other
 
 			--)
 				shift
@@ -819,15 +830,19 @@ Local_arguments ()
 				;;
 
 			*)
-				Echo_error "internal error %s" "${0}"
+				Echo_error "Internal error, unhandled option: %s" "${1}"
 				exit 1
 				;;
 		esac
 	done
 }
 
+# Processing args such that we have a value for --config if given
+# We can thus momentarily print an appropriate message that we are ignoring it under certain circumstances
 Local_arguments "${@}"
 
+# Ignoring --config if CWD is already a git repo
+# Only print warning from direct execution, not when run from auto script redirection, to avoid repetition
 if [ -e .git ] && [ -n "${_CONFIG}" ]
 then
 	if [ "${1}" != "noauto" ]
@@ -838,7 +853,9 @@ then
 	_CONFIG=""
 fi
 
-if [ -e .build/config ] && [ -n "${_CONFIG}" ]
+# Ignoring --config if CWD already has a config
+# Only print warning from direct execution, not when run from auto script redirection, to avoid repetition
+if Stagefile_exists && [ -n "${_CONFIG}" ]
 then
 	if [ "${1}" != "noauto" ]
 	then
@@ -848,6 +865,7 @@ then
 	_CONFIG=""
 fi
 
+# Otherwise, handling --config request, copying specified config
 if [ -n "${_CONFIG}" ]
 then
 	if [ -e "${_CONFIG}" ] || [ -e "/usr/share/live/images/${_CONFIG}" ]
@@ -883,24 +901,19 @@ then
 	fi
 fi
 
-# Read meta config
-if [ "${1}" != "noauto" ] && [ -x auto/config ]
-then
-	Echo_message "Executing auto/config script."
-	./auto/config "${@}"
-	exit ${?}
-fi
-
-if [ "${1}" = "noauto" ]
-then
+# "Auto" script redirection.
+# Re-run via "auto" script to pick up saved command-line arguments, if not already redirected.
+# See the documentation of the Maybe_auto_redirect function for more details.
+if [ "${1}" = "noauto" ]; then
 	shift
+else
+	Maybe_auto_redirect config "${@}"
 fi
 
-# Reading system configuration
+# Reading config defaults configured at system level
 if ls /etc/live/build.conf > /dev/null 2>&1 || ls /etc/live/build/* > /dev/null 2>&1
 then
-	if In_list "--ignore-system-defaults" "${@}"
-	then
+	if [ "${_IGNORE_SYSTEM_DEFAULTS}" = "true" ]; then
 		Echo_message "Ignoring defaults in %s" "/etc/live/build.conf"
 	else
 		Echo_message "Using defaults in %s" "/etc/live/build.conf"
@@ -909,485 +922,372 @@ then
 	fi
 fi
 
-# Reading existing configuration
-Read_conffiles config/all config/common config/bootstrap config/chroot config/binary config/source
+# Reading existing saved configuration
+Read_conffiles $(Common_conffiles)
 
+# Processing arguments again to overwrite just-read previously saved settings as necessary
 Local_arguments "${@}"
 
+# Loading user specified saved config file if specified
 if [ -n "${_CONFFILE}" ]
 then
 	Read_conffiles "${_CONFFILE}"
 fi
 
-# Setting defaults
-Set_defaults
+# Setting and validating config
+Prepare_config
+Validate_config
 
-# Checking defaults
-Check_defaults
+if [ "${_VALIDATE_MODE}" = "true" ]; then
+	Echo_message "Validation check complete! Please address any problem notices given above."
+	exit 0
+fi
+
+# Creating or updating saved config
 
 if [ ! -e config ]
 then
-	Echo_message "Creating config tree for a ${LB_MODE}/${LB_DISTRIBUTION_BINARY}/${LB_ARCHITECTURES} system"
+	Echo_message "Creating config tree for a ${LB_MODE}/${LB_DISTRIBUTION_BINARY}/${LB_ARCHITECTURE} system"
 	mkdir config
 else
-	Echo_message "Updating config tree for a ${LB_MODE}/${LB_DISTRIBUTION_BINARY}/${LB_ARCHITECTURES} system"
+	Echo_message "Updating config tree for a ${LB_MODE}/${LB_DISTRIBUTION_BINARY}/${LB_ARCHITECTURE} system"
 fi
 
 # Creating live-build configuration
 cat > config/common << EOF
 # config/common - common options for live-build(7)
 
-# \$LB_APT: set package manager
-# (Default: ${LB_APT})
+# Version of live-build used to build config (config format version)
+LB_CONFIGURATION_VERSION="${LB_CONFIGURATION_VERSION}"
+
+# Set package manager
 LB_APT="${LB_APT}"
 
-# \$LB_APT_FTP_PROXY: set apt/aptitude ftp proxy
-# (Default: autodetected or empty)
+# Set apt/aptitude ftp proxy
 LB_APT_FTP_PROXY="${LB_APT_FTP_PROXY}"
 
-# \$LB_APT_HTTP_PROXY: set apt/aptitude http proxy
-# (Default: autodetected or empty)
+# Set apt/aptitude http proxy
 LB_APT_HTTP_PROXY="${LB_APT_HTTP_PROXY}"
 
-# \$LB_APT_PIPELINE: set apt/aptitude pipeline depth
-# (Default: ${LB_APT_PIPELINE})
+# Set apt/aptitude pipeline depth
 LB_APT_PIPELINE="${LB_APT_PIPELINE}"
 
-# \$LB_APT_RECOMMENDS: set apt/aptitude recommends
-# (Default: ${LB_APT_RECOMMENDS})
+# Set apt/aptitude recommends
 LB_APT_RECOMMENDS="${LB_APT_RECOMMENDS}"
 
-# \$LB_APT_SECURE: set apt/aptitude security
-# (Default: ${LB_APT_SECURE})
+# Set apt/aptitude security
 LB_APT_SECURE="${LB_APT_SECURE}"
 
-# \$LB_APT_SOURCE_ARCHIVES: set apt/aptitude source entries in sources.list
-# (Default: ${LB_APT_SOURCE_ARCHIVES})
+# Set apt/aptitude source entries in sources.list
 LB_APT_SOURCE_ARCHIVES="${LB_APT_SOURCE_ARCHIVES}"
 
-# \$LB_CACHE: control cache
-# (Default: ${LB_CACHE})
+# Control cache
 LB_CACHE="${LB_CACHE}"
 
-# \$LB_CACHE_INDICES: control if downloaded package indices should be cached
-# (Default: ${LB_CACHE_INDICES})
+# Control if downloaded package indices should be cached
 LB_CACHE_INDICES="${LB_CACHE_INDICES}"
 
-# \$LB_CACHE_PACKAGES: control if downloaded packages files should be cached
-# (Default: ${LB_CACHE_PACKAGES})
+# Control if downloaded packages files should be cached
 LB_CACHE_PACKAGES="${LB_CACHE_PACKAGES}"
 
-# \$LB_CACHE_STAGES: control if completed stages should be cached
-# (Default: ${LB_CACHE_STAGES})
+# Control if completed stages should be cached
 LB_CACHE_STAGES="${LB_CACHE_STAGES}"
 
-# \$LB_DEBCONF_FRONTEND: set debconf(1) frontend to use
-# (Default: ${LB_DEBCONF_FRONTEND})
+# Set debconf(1) frontend to use
 LB_DEBCONF_FRONTEND="${LB_DEBCONF_FRONTEND}"
 
-# \$LB_DEBCONF_PRIORITY: set debconf(1) priority to use
-# (Default: ${LB_DEBCONF_PRIORITY})
+# Set debconf(1) priority to use
 LB_DEBCONF_PRIORITY="${LB_DEBCONF_PRIORITY}"
 
-# \$LB_INITRAMFS: set initramfs hook
-# (Default: ${LB_INITRAMFS})
+# Set initramfs hook
 LB_INITRAMFS="${LB_INITRAMFS}"
 
-# \$LB_INITRAMFS_COMPRESSION: set initramfs compression
-# (Default: ${LB_INITRAMFS_COMPRESSION})
+# Set initramfs compression
 LB_INITRAMFS_COMPRESSION="${LB_INITRAMFS_COMPRESSION}"
 
-# \$LB_INITSYSTEM: set init system
-# (Default: ${LB_INITSYSTEM})
+# Set init system
 LB_INITSYSTEM="${LB_INITSYSTEM}"
 
-# \$LB_FDISK: set fdisk program
-# (Default: autodetected)
-LB_FDISK="${LB_FDISK}"
-
-# \$LB_LOSETUP: set losetup program
-# (Default: autodetected)
-LB_LOSETUP="${LB_LOSETUP}"
-
-# \$LB_MODE: set distribution mode
-# (Default: ${LB_MODE})
+# Set distribution mode
 LB_MODE="${LB_MODE}"
 
-# \$LB_SYSTEM: set system type
-# (Default: ${LB_SYSTEM})
+# Set system type
 LB_SYSTEM="${LB_SYSTEM}"
 
-# \$LB_TASKSEL: set tasksel program
-# (Default: ${LB_TASKSEL})
-LB_TASKSEL="${LB_TASKSEL}"
+# Set base name of the image
+LB_IMAGE_NAME="${LB_IMAGE_NAME}"
+
+# Set options to use with apt
+APT_OPTIONS="${APT_OPTIONS}"
+
+# Set options to use with aptitude
+APTITUDE_OPTIONS="${APTITUDE_OPTIONS}"
+
+# Set options to use with debootstrap
+DEBOOTSTRAP_OPTIONS="${DEBOOTSTRAP_OPTIONS}"
+
+# Set script to use with debootstrap
+DEBOOTSTRAP_SCRIPT="${DEBOOTSTRAP_SCRIPT}"
+
+# Set options to use with gzip
+GZIP_OPTIONS="${GZIP_OPTIONS}"
+
+# Enable UTC timestamps
+LB_UTC_TIME="${LB_UTC_TIME}"
 
 # live-build options
 
-# \$_BREAKPOINTS: enable breakpoints
+# Enable breakpoints
 # If set here, overrides the command line option
-# (Default: ${_BREAKPOINTS})
 #_BREAKPOINTS="${_BREAKPOINTS}"
 
-# \$_DEBUG: enable debug
+# Enable debug
 # If set here, overrides the command line option
-# (Default: ${_DEBUG})
 #_DEBUG="${_DEBUG}"
 
-# \$_COLOR: enable color
+# Enable color
 # If set here, overrides the command line option
-# (Default: ${_COLOR})
 #_COLOR="${_COLOR}"
 
-# \$_FORCE: enable force
+# Enable force
 # If set here, overrides the command line option
-# (Default: ${_FORCE})
 #_FORCE="${_FORCE}"
 
-# \$_QUIET: enable quiet
+# Enable quiet
 # If set here, overrides the command line option
-# (Default: ${_QUIET})
 #_QUIET="${_QUIET}"
 
-# \$_VERBOSE: enable verbose
+# Enable verbose
 # If set here, overrides the command line option
-# (Default: ${_VERBOSE})
 #_VERBOSE="${_VERBOSE}"
-
-# Internal stuff (FIXME)
-APT_OPTIONS="${APT_OPTIONS}"
-APTITUDE_OPTIONS="${APTITUDE_OPTIONS}"
-DEBOOTSTRAP_OPTIONS="${DEBOOTSTRAP_OPTIONS}"
-DEBOOTSTRAP_SCRIPT="${DEBOOTSTRAP_SCRIPT}"
-GZIP_OPTIONS="${GZIP_OPTIONS}"
-ISOHYBRID_OPTIONS="${ISOHYBRID_OPTIONS}"
 EOF
 
 # Creating lb_bootstrap_* configuration
 cat > config/bootstrap << EOF
 # config/bootstrap - options for live-build(7), bootstrap stage
 
-# \$LB_DISTRIBUTION: select distribution to use
-# (Default: ${LB_DISTRIBUTION})
+# Select architecture to use
+LB_ARCHITECTURE="${LB_ARCHITECTURE}"
+
+# Select distribution to use
 LB_DISTRIBUTION="${LB_DISTRIBUTION}"
 
-# \$LB_PARENT_DISTRIBUTION: select parent distribution to use
-# (Default: ${LB_PARENT_DISTRIBUTION})
+# Select parent distribution to use
 LB_PARENT_DISTRIBUTION="${LB_PARENT_DISTRIBUTION}"
 
-# \$LB_DISTRIBUTION_CHROOT: select distribution to use in the chroot
-# (Default: ${LB_DISTRIBUTION_CHROOT})
+# Select distribution to use in the chroot
 LB_DISTRIBUTION_CHROOT="${LB_DISTRIBUTION_CHROOT}"
 
-# \$LB_PARENT_DISTRIBUTION_CHROOT: select parent distribution to use in the chroot
-# (Default: ${LB_PARENT_DISTRIBUTION_CHROOT})
+# Select parent distribution to use in the chroot
 LB_PARENT_DISTRIBUTION_CHROOT="${LB_PARENT_DISTRIBUTION_CHROOT}"
 
-# \$LB_DISTRIBUTION_BINARY: select distribution to use in the final image
-# (Default: ${LB_DISTRIBUTION_BINARY})
+# Select distribution to use in the final image
 LB_DISTRIBUTION_BINARY="${LB_DISTRIBUTION_BINARY}"
 
-# \$LB_PARENT_DISTRIBUTION_BINARY: select parent distribution to use in the final image
-# (Default: ${LB_PARENT_DISTRIBUTION_BINARY})
+# Select parent distribution to use in the final image
 LB_PARENT_DISTRIBUTION_BINARY="${LB_PARENT_DISTRIBUTION_BINARY}"
 
-# \$LB_PARENT_DEBIAN_INSTALLER_DISTRIBUTION: select parent distribution for debian-installer to use
-# (Default: ${LB_PARENT_DEBIAN_INSTALLER_DISTRIBUTION})
+# Select parent distribution for debian-installer to use
 LB_PARENT_DEBIAN_INSTALLER_DISTRIBUTION="${LB_PARENT_DEBIAN_INSTALLER_DISTRIBUTION}"
 
-# \$LB_PARENT_MIRROR_BOOTSTRAP: set parent mirror to bootstrap from
-# (Default: ${LB_PARENT_MIRROR_BOOTSTRAP})
+# Select archive areas to use
+LB_ARCHIVE_AREAS="${LB_ARCHIVE_AREAS}"
+
+# Select parent archive areas to use
+LB_PARENT_ARCHIVE_AREAS="${LB_PARENT_ARCHIVE_AREAS}"
+
+# Set parent mirror to bootstrap from
 LB_PARENT_MIRROR_BOOTSTRAP="${LB_PARENT_MIRROR_BOOTSTRAP}"
 
-# \$LB_PARENT_MIRROR_CHROOT: set parent mirror to fetch packages from
-# (Default: ${LB_PARENT_MIRROR_CHROOT})
+# Set parent mirror to fetch packages from
 LB_PARENT_MIRROR_CHROOT="${LB_PARENT_MIRROR_CHROOT}"
 
-# \$LB_PARENT_MIRROR_CHROOT_SECURITY: set security parent mirror to fetch packages from
-# (Default: ${LB_PARENT_MIRROR_CHROOT_SECURITY})
+# Set security parent mirror to fetch packages from
 LB_PARENT_MIRROR_CHROOT_SECURITY="${LB_PARENT_MIRROR_CHROOT_SECURITY}"
 
-# \$LB_PARENT_MIRROR_BINARY: set parent mirror which ends up in the image
-# (Default: ${LB_PARENT_MIRROR_BINARY})
+# Set parent mirror which ends up in the image
 LB_PARENT_MIRROR_BINARY="${LB_PARENT_MIRROR_BINARY}"
 
-# \$LB_PARENT_MIRROR_BINARY_SECURITY: set security parent mirror which ends up in the image
-# (Default: ${LB_PARENT_MIRROR_BINARY_SECURITY})
+# Set security parent mirror which ends up in the image
 LB_PARENT_MIRROR_BINARY_SECURITY="${LB_PARENT_MIRROR_BINARY_SECURITY}"
 
-# \$LB_PARENT_MIRROR_DEBIAN_INSTALLER: set debian-installer parent mirror
-# (Default: ${LB_PARENT_MIRROR_BOOTSTRAP})
+# Set debian-installer parent mirror
 LB_PARENT_MIRROR_DEBIAN_INSTALLER="${LB_PARENT_MIRROR_DEBIAN_INSTALLER}"
 
-# \$LB_MIRROR_BOOTSTRAP: set mirror to bootstrap from
-# (Default: ${LB_MIRROR_BOOTSTRAP})
+# Set mirror to bootstrap from
 LB_MIRROR_BOOTSTRAP="${LB_MIRROR_BOOTSTRAP}"
 
-# \$LB_MIRROR_CHROOT: set mirror to fetch packages from
-# (Default: ${LB_MIRROR_CHROOT})
+# Set mirror to fetch packages from
 LB_MIRROR_CHROOT="${LB_MIRROR_CHROOT}"
 
-# \$LB_MIRROR_CHROOT_SECURITY: set security mirror to fetch packages from
-# (Default: ${LB_MIRROR_CHROOT_SECURITY})
+# Set security mirror to fetch packages from
 LB_MIRROR_CHROOT_SECURITY="${LB_MIRROR_CHROOT_SECURITY}"
 
-# \$LB_MIRROR_BINARY: set mirror which ends up in the image
-# (Default: ${LB_MIRROR_BINARY})
+# Set mirror which ends up in the image
 LB_MIRROR_BINARY="${LB_MIRROR_BINARY}"
 
-# \$LB_MIRROR_BINARY_SECURITY: set security mirror which ends up in the image
-# (Default: ${LB_MIRROR_BINARY_SECURITY})
+# Set security mirror which ends up in the image
 LB_MIRROR_BINARY_SECURITY="${LB_MIRROR_BINARY_SECURITY}"
 
-# \$LB_MIRROR_DEBIAN_INSTALLER: set debian-installer mirror
-# (Default: ${LB_MIRROR_BOOTSTRAP})
+# Set debian-installer mirror
 LB_MIRROR_DEBIAN_INSTALLER="${LB_MIRROR_DEBIAN_INSTALLER}"
 
-# \$LB_BOOTSTRAP_QEMU_ARCHITECTURES: architectures to use foreign bootstrap
-# (Default: ${LB_BOOTSTRAP_QEMU_ARCHITECTURES})
-LB_BOOTSTRAP_QEMU_ARCHITECTURES="${LB_BOOTSTRAP_QEMU_ARCHITECTURES}"
+# Set architectures to use foreign bootstrap
+LB_BOOTSTRAP_QEMU_ARCHITECTURE="${LB_BOOTSTRAP_QEMU_ARCHITECTURE}"
 
-# \$LB_BOOTSTRAP_QEMU_EXCLUDE: packages to exclude during foreign bootstrap
-# (Default: ${LB_BOOTSTRAP_QEMU_EXCLUDE})
+# Set packages to exclude during foreign bootstrap
 LB_BOOTSTRAP_QEMU_EXCLUDE="${LB_BOOTSTRAP_QEMU_EXCLUDE}"
 
-# \$LB_BOOTSTRAP_QEMU_STATIC: static qemu binary for foreign bootstrap
-# (Default: ${LB_BOOTSTRAP_QEMU_STATIC})
+# Set static qemu binary for foreign bootstrap
 LB_BOOTSTRAP_QEMU_STATIC="${LB_BOOTSTRAP_QEMU_STATIC}"
 EOF
 
 # Creating lb_chroot_* configuration
-mkdir -p config/archives
-mkdir -p config/apt
-mkdir -p config/packages
-mkdir -p config/packages.chroot
-mkdir -p config/package-lists
-mkdir -p config/preseed
-
 cat > config/chroot << EOF
 # config/chroot - options for live-build(7), chroot stage
 
-# \$LB_CHROOT_FILESYSTEM: set chroot filesystem
-# (Default: ${LB_CHROOT_FILESYSTEM})
+# Set chroot filesystem
 LB_CHROOT_FILESYSTEM="${LB_CHROOT_FILESYSTEM}"
 
-# \$LB_UNION_FILESYSTEM: set union filesystem
-# (Default: ${LB_UNION_FILESYSTEM})
+# Set chroot squashfs compression level
+LB_CHROOT_SQUASHFS_COMPRESSION_LEVEL="${LB_CHROOT_SQUASHFS_COMPRESSION_LEVEL}"
+
+# Set chroot squashfs compression type
+LB_CHROOT_SQUASHFS_COMPRESSION_TYPE="${LB_CHROOT_SQUASHFS_COMPRESSION_TYPE}"
+
+# Set union filesystem
 LB_UNION_FILESYSTEM="${LB_UNION_FILESYSTEM}"
 
-# \$LB_INTERACTIVE: set interactive build
-# (Default: ${LB_INTERACTIVE})
+# Set interactive build
 LB_INTERACTIVE="${LB_INTERACTIVE}"
 
-# \$LB_KEYRING_PACKAGES: set keyring packages
-# (Default: empty)
+# Set keyring packages
 LB_KEYRING_PACKAGES="${LB_KEYRING_PACKAGES}"
 
-# \$LB_LINUX_FLAVOURS: set kernel flavour to use
-# This is kept for backwards compatibility
-# (Default: autodetected)
-if [ -n "${LB_LINUX_FLAVOURS}" ]
-then
-	LB_LINUX_FLAVOURS_WITH_ARCH="${LB_LINUX_FLAVOURS}"
-fi
-
-# \$LB_LINUX_FLAVOURS_WITH_ARCH: set kernel flavour to use (with arch)
-# (Default: autodetected)
+# Set kernel flavour to use (with arch)
 LB_LINUX_FLAVOURS_WITH_ARCH="${LB_LINUX_FLAVOURS_WITH_ARCH}"
 
-# \$LB_LINUX_PACKAGES: set kernel packages to use
-# (Default: autodetected)
+# Set kernel packages to use
 LB_LINUX_PACKAGES="${LB_LINUX_PACKAGES}"
 
-# \$LB_SECURITY: enable security updates
-# (Default: ${LB_SECURITY})
+# Enable security updates
 LB_SECURITY="${LB_SECURITY}"
 
-# \$LB_UPDATES: enable updates updates
-# (Default: ${LB_UPDATES})
+# Enable updates updates
 LB_UPDATES="${LB_UPDATES}"
 
-# \$LB_BACKPORTS: enable backports updates
-# (Default: ${LB_BACKPORTS})
+# Enable backports updates
 LB_BACKPORTS="${LB_BACKPORTS}"
 EOF
 
 # Creating lb_binary_* configuration
-mkdir -p config/debian-installer
-mkdir -p config/includes.installer
-mkdir -p config/packages.binary
-mkdir -p config/package-lists
-mkdir -p config/rootfs
-
 cat > config/binary << EOF
 # config/binary - options for live-build(7), binary stage
 
-# \$LB_BINARY_FILESYSTEM: set image filesystem
-# (Default: ${LB_BINARY_FILESYSTEM})
+# Set image type
+LB_IMAGE_TYPE="${LB_IMAGE_TYPE}"
+
+# Set image filesystem
 LB_BINARY_FILESYSTEM="${LB_BINARY_FILESYSTEM}"
 
-# \$LB_APT_INDICES: set apt/aptitude generic indices
-# (Default: ${LB_APT_INDICES})
+# Set apt/aptitude generic indices
 LB_APT_INDICES="${LB_APT_INDICES}"
 
-# \$LB_BOOTAPPEND_LIVE: set boot parameters
-# (Default: empty)
+# Set boot parameters
 LB_BOOTAPPEND_LIVE="${LB_BOOTAPPEND_LIVE}"
 
-# \$LB_BOOTAPPEND_INSTALL: set boot parameters
-# (Default: empty)
+# Set boot parameters
 LB_BOOTAPPEND_INSTALL="${LB_BOOTAPPEND_INSTALL}"
 
-# \$LB_BOOTAPPEND_LIVE_FAILSAFE: set boot parameters
-# (Default: empty)
+# Set boot parameters
 LB_BOOTAPPEND_LIVE_FAILSAFE="${LB_BOOTAPPEND_LIVE_FAILSAFE}"
 
-# \$LB_BOOTLOADERS: set bootloaders
-# (Default: ${LB_BOOTLOADERS})
-LB_BOOTLOADERS="${LB_BOOTLOADERS}"
+# Set BIOS bootloader
+LB_BOOTLOADER_BIOS="${LB_BOOTLOADER_BIOS}"
 
-# \$LB_CHECKSUMS: set checksums
-# (Default: ${LB_CHECKSUMS})
+# Set EFI bootloader
+LB_BOOTLOADER_EFI="${LB_BOOTLOADER_EFI}"
+
+# Set checksums
 LB_CHECKSUMS="${LB_CHECKSUMS}"
 
-# \$LB_COMPRESSION: set compression
-# (Default: ${LB_COMPRESSION})
+# Set compression
 LB_COMPRESSION="${LB_COMPRESSION}"
 
-# \$LB_ZSYNC: set zsync
-# (Default: ${LB_ZSYNC})
+# Set zsync
 LB_ZSYNC="${LB_ZSYNC}"
 
-# \${LB_BUILD_WITH_CHROOT: control if we build binary images chrooted
-# (Default: ${LB_BUILD_WITH_CHROOT})
-# DO NEVER, *NEVER*, *N*E*V*E*R* SET THIS OPTION to false.
+# Control if we build binary images chrooted
+# NEVER, *EVER*, *E*V*E*R* SET THIS OPTION to false.
 LB_BUILD_WITH_CHROOT="${LB_BUILD_WITH_CHROOT}"
 
-# \$LB_DEBIAN_INSTALLER: set debian-installer
-# (Default: ${LB_DEBIAN_INSTALLER})
+# Set debian-installer
 LB_DEBIAN_INSTALLER="${LB_DEBIAN_INSTALLER}"
 
-# \$LB_DEBIAN_INSTALLER_DISTRIBUTION: set debian-installer suite
-# (Default: empty)
+# Set debian-installer suite
 LB_DEBIAN_INSTALLER_DISTRIBUTION="${LB_DEBIAN_INSTALLER_DISTRIBUTION}"
 
-# \$LB_DEBIAN_INSTALLER_PRESEEDFILE: set debian-installer preseed filename/url
-# (Default: ${LB_DEBIAN_INSTALLER_PRESEEDFILE})
+# Set debian-installer preseed filename/url
 LB_DEBIAN_INSTALLER_PRESEEDFILE="${LB_DEBIAN_INSTALLER_PRESEEDFILE}"
 
-# \$LB_DEBIAN_INSTALLER_GUI: toggle use of GUI debian-installer
-# (Default: ${LB_DEBIAN_INSTALLER_GUI})
+# Toggle use of GUI debian-installer
 LB_DEBIAN_INSTALLER_GUI="${LB_DEBIAN_INSTALLER_GUI}"
 
-# \$LB_GRUB_SPLASH: set custom grub splash
-# (Default: empty)
-LB_GRUB_SPLASH="${LB_GRUB_SPLASH}"
-
-# \$LB_HDD_LABEL: set hdd label
-# (Default: ${LB_HDD_LABEL})
+# Set hdd label
 LB_HDD_LABEL="${LB_HDD_LABEL}"
 
-# \$LB_HDD_SIZE: set hdd filesystem size
-# (Default: ${LB_HDD_SIZE})
+# Set hdd filesystem size
 LB_HDD_SIZE="${LB_HDD_SIZE}"
 
-# \$LB_HDD_PARTITION_START: set start of partition for the hdd target for BIOSes that expect a specific boot partition start (e.g. "63s"). If empty, use optimal layout.
-# (Default: ${LB_HDD_PARTITION_START})
+# Set start of partition for the hdd target for BIOSes that expect a specific boot partition start (e.g. "63s"). If empty, use optimal layout.
 LB_HDD_PARTITION_START="${LB_HDD_PARTITION_START}"
 
-# \$LB_ISO_APPLICATION: set iso author
-# (Default: ${LB_ISO_APPLICATION})
+# Set iso author
 LB_ISO_APPLICATION="${LB_ISO_APPLICATION}"
 
-# \$LB_ISO_PREPARER: set iso preparer
-# (Default: ${LB_ISO_PREPARER})
+# Set iso preparer
 LB_ISO_PREPARER="${LB_ISO_PREPARER}"
 
-# \$LB_ISO_PUBLISHER: set iso publisher
-# (Default: ${LB_ISO_PUBLISHER})
+# Set iso publisher
 LB_ISO_PUBLISHER="${LB_ISO_PUBLISHER}"
 
-# \$LB_ISO_VOLUME: set iso volume (max 32 chars)
-# (Default: ${LB_ISO_VOLUME})
+# Set iso volume (max 32 chars)
 LB_ISO_VOLUME="${LB_ISO_VOLUME}"
 
-# \$LB_JFFS2_ERASEBLOCK: set jffs2 eraseblock size
-# (Default: unset)
-LB_JFFS2_ERASEBLOCK=""
+# Set jffs2 eraseblock size
+LB_JFFS2_ERASEBLOCK="${LB_JFFS2_ERASEBLOCK}"
 
-# \$LB_MEMTEST: set memtest
-# (Default: ${LB_MEMTEST})
+# Set memtest
 LB_MEMTEST="${LB_MEMTEST}"
 
-# \$LB_LOADLIN: set loadlin
-# (Default: ${LB_LOADLIN})
+# Set loadlin
 LB_LOADLIN="${LB_LOADLIN}"
 
-# \$LB_WIN32_LOADER: set win32-loader
-# (Default: ${LB_WIN32_LOADER})
+# Set win32-loader
 LB_WIN32_LOADER="${LB_WIN32_LOADER}"
 
-# \$LB_NET_ROOT_FILESYSTEM: set netboot filesystem
-# (Default: ${LB_NET_ROOT_FILESYSTEM})
-LB_NET_ROOT_FILESYSTEM="${LB_NET_ROOT_FILESYSTEM}"
-
-# \$LB_NET_ROOT_MOUNTOPTIONS: set nfsopts
-# (Default: empty)
-LB_NET_ROOT_MOUNTOPTIONS="${LB_NET_ROOT_MOUNTOPTIONS}"
-
-# \$LB_NET_ROOT_PATH: set netboot server directory
-# (Default: ${LB_NET_ROOT_PATH})
-LB_NET_ROOT_PATH="${LB_NET_ROOT_PATH}"
-
-# \$LB_NET_ROOT_SERVER: set netboot server address
-# (Default: ${LB_NET_ROOT_SERVER})
-LB_NET_ROOT_SERVER="${LB_NET_ROOT_SERVER}"
-
-# \$LB_NET_COW_FILESYSTEM: set net client cow filesystem
-# (Default: ${LB_NET_COW_FILESYSTEM})
-LB_NET_COW_FILESYSTEM="${LB_NET_COW_FILESYSTEM}"
-
-# \$LB_NET_COW_MOUNTOPTIONS: set cow mount options
-# (Default: empty)
-LB_NET_COW_MOUNTOPTIONS="${LB_NET_COW_MOUNTOPTIONS}"
-
-# \$LB_NET_COW_PATH: set cow directory
-# (Default: ${LB_NET_COW_PATH})
-LB_NET_COW_PATH="${LB_NET_COW_PATH}"
-
-# \$LB_NET_COW_SERVER: set cow server
-# (Default: ${LB_NET_COW_SERVER})
-LB_NET_COW_SERVER="${LB_NET_COW_SERVER}"
-
-# \$LB_NET_TARBALL: set net tarball
-# (Default: ${LB_NET_TARBALL})
+# Set net tarball
 LB_NET_TARBALL="${LB_NET_TARBALL}"
 
-# \$LB_ONIE: set onie
-# (Default: ${LB_ONIE})
+# Set onie
 LB_ONIE="${LB_ONIE}"
 
-# \$LB_ONIE_KERNEL_CMDLINE: set onie additional kernel cmdline options
-# (Default: ${LB_ONIE_KERNEL_CMDLINE})
+# Set onie additional kernel cmdline options
 LB_ONIE_KERNEL_CMDLINE="${LB_ONIE_KERNEL_CMDLINE}"
 
-# \$LB_FIRMWARE_BINARY: include firmware packages in debian-installer
-# (Default: ${LB_FIRMWARE_BINARY})
+# Set inclusion of firmware packages in debian-installer
 LB_FIRMWARE_BINARY="${LB_FIRMWARE_BINARY}"
 
-# \$LB_FIRMWARE_CHROOT: include firmware packages in debian-installer
-# (Default: ${LB_FIRMWARE_CHROOT})
+# Set inclusion of firmware packages in the live image
 LB_FIRMWARE_CHROOT="${LB_FIRMWARE_CHROOT}"
 
-# \$LB_SWAP_FILE_PATH: set swap file path
-# (Default: ${LB_SWAP_FILE_PATH})
+# Set swap file path
 LB_SWAP_FILE_PATH="${LB_SWAP_FILE_PATH}"
 
-# \$LB_SWAP_FILE_SIZE: set swap file size
-# (Default: ${LB_SWAP_FILE_SIZE})
+# Set swap file size
 LB_SWAP_FILE_SIZE="${LB_SWAP_FILE_SIZE}"
 
-# \$LB_UEFI_SECURE_BOOT: enable/disable UEFI secure boot
-# (Default: ${LB_UEFI_SECURE_BOOT})
+# Enable/disable UEFI secure boot support
 LB_UEFI_SECURE_BOOT="${LB_UEFI_SECURE_BOOT}"
 EOF
 
@@ -1395,33 +1295,34 @@ EOF
 cat > config/source << EOF
 # config/source - options for live-build(7), source stage
 
-# \$LB_SOURCE: set source option
-# (Default: ${LB_SOURCE})
+# Set source option
 LB_SOURCE="${LB_SOURCE}"
 
-# \$LB_SOURCE_IMAGES: set image type
-# (Default: ${LB_SOURCE_IMAGES})
+# Set image type
 LB_SOURCE_IMAGES="${LB_SOURCE_IMAGES}"
 EOF
 
 mkdir -p auto
+mkdir -p config/apt
+mkdir -p config/archives
+mkdir -p config/bootloaders
+mkdir -p config/debian-installer
+mkdir -p config/hooks/live
+mkdir -p config/hooks/normal
+mkdir -p config/includes
+mkdir -p config/includes.binary
+mkdir -p config/includes.bootstrap
+mkdir -p config/includes.chroot_after_packages
+mkdir -p config/includes.chroot_before_packages
+mkdir -p config/includes.installer
+mkdir -p config/includes.source
+mkdir -p config/package-lists
+mkdir -p config/packages
+mkdir -p config/packages.binary
+mkdir -p config/packages.chroot
+mkdir -p config/preseed
+mkdir -p config/rootfs
 mkdir -p local/bin
-
-# Checking defaults again
-Check_defaults
-
-if [ "${_CLEAN}" = "true" ]
-then
-	# Remove empty directories in config tree
-	rmdir --ignore-fail-on-non-empty auto > /dev/null 2>&1 || true
-	rmdir --ignore-fail-on-non-empty config/*/ > /dev/null 2>&1 || true
-	rmdir --ignore-fail-on-non-empty config > /dev/null 2>&1 || true
-	rmdir --ignore-fail-on-non-empty local/*/ > /dev/null 2>&1 || true
-	rmdir --ignore-fail-on-non-empty local > /dev/null 2>&1 || true
-fi
-
-mkdir -p config/hooks/normal config/hooks/live
-mkdir -p config/includes config/includes.bootstrap config/includes.chroot config/includes.binary config/includes.source
 
 Echo_message "Symlinking hooks..."
 
@@ -1441,66 +1342,36 @@ do
 	fi
 done
 
-if [ ! -e config/package-lists/live.list.chroot ]
-then
-	mkdir -p config/package-lists
+LIVE_PKG_LIST="config/package-lists/live.list.chroot"
+if [ ! -e "${LIVE_PKG_LIST}" ]; then
+	NEEDED_PACKAGES=""
+	if [ "${LB_INITRAMFS}" = "live-boot" ]; then
+		NEEDED_PACKAGES="live-boot live-config"
+		case "${LB_INITSYSTEM}" in
+			systemd)
+				NEEDED_PACKAGES="${NEEDED_PACKAGES} live-config-systemd"
+				;;
 
-	case "${LB_INITRAMFS}" in
-		live-boot)
-			echo "live-boot" > config/package-lists/live.list.chroot
-			echo "live-config" >> config/package-lists/live.list.chroot
-
-			case "${LB_INITSYSTEM}" in
-				none)
-					# do nothing
-					;;
-
-				systemd)
-					echo "live-config-systemd" >> config/package-lists/live.list.chroot
-					;;
-
-				sysvinit)
-					echo "live-config-${LB_INITSYSTEM}" >> config/package-lists/live.list.chroot
-					echo "sysvinit-core" >> config/package-lists/live.list.chroot
-					;;
-			esac
-			;;
-
-		*)
-			;;
-esac
-
+			sysvinit)
+				NEEDED_PACKAGES="${NEEDED_PACKAGES} live-config-sysvinit sysvinit-core"
+				;;
+		esac
+	fi
+	for PKG in $NEEDED_PACKAGES; do
+		echo "${PKG}" >> "${LIVE_PKG_LIST}"
+	done
 fi
 
-cat > config/build << EOF
-[Image]
-Architecture: ${LB_ARCHITECTURES}
-Archive-Areas: ${LB_ARCHIVE_AREAS}
-Distribution-Chroot: ${LB_DISTRIBUTION_CHROOT}
-Distribution-Binary: ${LB_DISTRIBUTION_BINARY}
-Mirror-Bootstrap: ${LB_MIRROR_BOOTSTRAP}
-EOF
-
-if [ "${LB_DERIVATIVE}" = "true" ]
-then
-
-cat >> config/build << EOF
-
-Parent-Archive-Areas: ${LB_ARCHIVE_AREAS}
-Parent-Distribution-Chroot: ${LB_PARENT_DISTRIBUTION_CHROOT}
-Parent-Distribution-Binary: ${LB_PARENT_DISTRIBUTION_BINARY}
-Parent-Mirror-Bootstrap: ${LB_PARENT_MIRROR_BOOTSTRAP}
-EOF
-
+# Remove empty directories (if user has requested via --clean)
+if [ "${_CLEAN}" = "true" ]; then
+	# Note, the point of the error handling here is for avoiding failure and messy output
+	# should a permissions failure block deletion.
+	rmdir --ignore-fail-on-non-empty auto >/dev/null 2>&1 || true
+	rmdir --ignore-fail-on-non-empty config/*/ >/dev/null 2>&1 || true
+	rmdir --ignore-fail-on-non-empty config >/dev/null 2>&1 || true
+	rmdir --ignore-fail-on-non-empty local/*/ >/dev/null 2>&1 || true
+	rmdir --ignore-fail-on-non-empty local >/dev/null 2>&1 || true
 fi
-
-cat >> config/build << EOF
-
-[FIXME]
-Configuration-Version: ${LIVE_CONFIGURATION_VERSION}
-Name: ${LIVE_IMAGE_NAME}
-Type: ${LIVE_IMAGE_TYPE}
-EOF
 
 # Creating stage file
-Create_stagefile .build/config
+Create_stagefile

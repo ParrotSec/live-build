@@ -1,6 +1,7 @@
 #!/bin/sh
 
 ## live-build(7) - System Build Scripts
+## Copyright (C) 2016-2020 The Debian Live team
 ## Copyright (C) 2006-2015 Daniel Baumann <mail@daniel-baumann.ch>
 ##
 ## This program comes with ABSOLUTELY NO WARRANTY; for details see COPYING.
@@ -8,11 +9,18 @@
 ## under certain conditions; see COPYING for details.
 
 
+# The file that records temporarily installed packages.
+Installed_tmp_packages_file ()
+{
+	echo "chroot.installed_tmp_pkgs"
+}
+
+# Note, writes to _LB_PACKAGES
 Check_package ()
 {
-	CHROOT="${1}"
-	FILE="${2}"
-	PACKAGE="${3}"
+	local CHROOT="${1}"
+	local FILE="${2}"
+	local PACKAGE="${3}"
 
 	Check_installed "${CHROOT}" "${FILE}" "${PACKAGE}"
 
@@ -28,35 +36,73 @@ Check_package ()
 	fi
 }
 
-Install_package ()
+# Note, reads from _LB_PACKAGES
+Install_packages ()
 {
-	if [ -n "${_LB_PACKAGES}" ] && [ "${LB_BUILD_WITH_CHROOT}" != "false" ]
-	then
+	if [ -z "${_LB_PACKAGES}" ] || [ "${LB_BUILD_WITH_CHROOT}" != "true" ]; then
+		return
+	fi
+
+	# Record in file to survive failure such that recovery can take place.
+	local LIST_FILE
+	LIST_FILE="$(Installed_tmp_packages_file)"
+	local PACKAGE
+	for PACKAGE in ${_LB_PACKAGES}; do
+		echo "${PACKAGE}" >> "${LIST_FILE}"
+	done
+
+	case "${LB_APT}" in
+		apt|apt-get)
+			Chroot chroot "apt-get install -o APT::Install-Recommends=false ${APT_OPTIONS} ${_LB_PACKAGES}"
+			;;
+
+		aptitude)
+			Chroot chroot "aptitude install --without-recommends ${APTITUDE_OPTIONS} ${_LB_PACKAGES}"
+			;;
+	esac
+	unset _LB_PACKAGES # Can clear this now
+}
+
+Remove_packages ()
+{
+	if [ "${LB_BUILD_WITH_CHROOT}" != "true" ]; then
+		return
+	fi
+
+	local LIST_FILE
+	LIST_FILE="$(Installed_tmp_packages_file)"
+
+	# List is read from file to ensure packages from any past failure are
+	# included in the list on re-running scripts to recover.
+	local PACKAGES=""
+	if [ -e "${LIST_FILE}" ]; then
+		local PACKAGE
+		while read -r PACKAGE; do
+			PACKAGES="${PACKAGES} ${PACKAGE}"
+		done < "${LIST_FILE}"
+	fi
+
+	if [ -n "${PACKAGES}" ]; then
 		case "${LB_APT}" in
 			apt|apt-get)
-				Chroot chroot "apt-get install -o APT::Install-Recommends=false ${APT_OPTIONS} ${_LB_PACKAGES}"
+				Chroot chroot "apt-get remove --auto-remove --purge ${APT_OPTIONS} ${PACKAGES}"
 				;;
 
 			aptitude)
-				Chroot chroot "aptitude install --without-recommends ${APTITUDE_OPTIONS} ${_LB_PACKAGES}"
+				Chroot chroot "aptitude purge --purge-unused ${APTITUDE_OPTIONS} ${PACKAGES}"
 				;;
 		esac
 	fi
+
+	rm -f "${LIST_FILE}"
 }
 
-Remove_package ()
+#FIXME: make use of this. see commit log that added this for details.
+# Perform temp package removal for recovery if necessary
+Cleanup_temp_packages ()
 {
-	if [ -n "${_LB_PACKAGES}" ] && [ "${LB_BUILD_WITH_CHROOT}" != "false" ]
-	then
-		case "${LB_APT}" in
-			apt|apt-get)
-				Chroot chroot "apt-get remove --purge ${APT_OPTIONS} ${_LB_PACKAGES}"
-				;;
-
-			aptitude)
-				Chroot chroot "aptitude purge ${APTITUDE_OPTIONS} ${_LB_PACKAGES}"
-				;;
-		esac
+	if [ -e "$(Installed_tmp_packages_file)" ]; then
+		Remove_packages
 	fi
 }
 
@@ -67,9 +113,9 @@ Remove_package ()
 #                  2 if package isn't installed and we aren't in an apt managed system
 Check_installed ()
 {
-	CHROOT="${1}"
-	FILE="${2}"
-	PACKAGE="${3}"
+	local CHROOT="${1}"
+	local FILE="${2}"
+	local PACKAGE="${3}"
 
 	if [ "${LB_BUILD_WITH_CHROOT}" = "true" ] && [ "${CHROOT}" = "chroot" ]
 	then
@@ -80,7 +126,7 @@ Check_installed ()
 			INSTALL_STATUS=1
 		fi
 	else
-		if which dpkg-query > /dev/null 2>&1
+		if [ -e /etc/debian_version ]
 		then
 			if dpkg-query -s "${PACKAGE}" 2> /dev/null | grep -qs "Status: install"
 			then

@@ -1,6 +1,7 @@
 #!/bin/sh
 
 ## live-build(7) - System Build Scripts
+## Copyright (C) 2016-2020 The Debian Live team
 ## Copyright (C) 2006-2015 Daniel Baumann <mail@daniel-baumann.ch>
 ##
 ## This program comes with ABSOLUTELY NO WARRANTY; for details see COPYING.
@@ -8,18 +9,24 @@
 ## under certain conditions; see COPYING for details.
 
 
+Common_conffiles ()
+{
+	echo "config/all config/common config/bootstrap config/chroot config/binary config/source"
+}
+
 Get_conffiles ()
 {
+	local FILES
 	if [ -n "${LB_CONFIG}" ]
 	then
 		FILES="${LB_CONFIG}"
 	else
-		for FILE in ${@}
-		do
-			FILES="${FILES} ${FILE} ${FILE}.${LB_ARCHITECTURES} ${FILE}.${DISTRIBUTION}"
-			FILES="${FILES} config/$(echo ${PROGRAM} | sed -e 's|^lb_||')"
-			FILES="${FILES} config/$(echo ${PROGRAM} | sed -e 's|^lb_||').${ARCHITECTURE}"
-			FILES="${FILES} config/$(echo ${PROGRAM} | sed -e 's|^lb_||').${DISTRIBUTION}"
+		# List standard files first, then possible user arch/dist overrides
+		FILES="${@}"
+		local FILE
+		for FILE in "${@}"; do
+			FILES="${FILES} ${LB_ARCHITECTURE:+$FILE.$LB_ARCHITECTURE}"
+			FILES="${FILES} ${LB_DISTRIBUTION:+$FILE.$LB_DISTRIBUTION}"
 		done
 	fi
 
@@ -28,6 +35,7 @@ Get_conffiles ()
 
 Read_conffiles ()
 {
+	local CONFFILE
 	for CONFFILE in $(Get_conffiles "${@}")
 	do
 		if [ -f "${CONFFILE}" ]
@@ -45,6 +53,7 @@ Read_conffiles ()
 
 Print_conffiles ()
 {
+	local CONFFILE
 	for CONFFILE in $(Get_conffiles "${@}")
 	do
 		if [ -f "${CONFFILE}" ]

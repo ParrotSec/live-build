@@ -2,17 +2,17 @@ Source: live-build
 Section: misc
 Priority: optional
 XSBC-Original-Maintainer: Debian Live <debian-live@lists.debian.org>
-Maintainer: Parrot Team <team@parrotsec.org>
+Maintainer: Parrot Dev Team <team@parrotsec.org>
 Uploaders: Lorenzo "Palinuro" Faletra <palinuro@parrotsec.org>
 Build-Depends:
  debhelper-compat (= 12),
  po4a,
  gettext,
-Standards-Version: 4.4.1
+Standards-Version: 4.5.1
 Rules-Requires-Root: no
 Homepage: https://wiki.debian.org/DebianLive
-Vcs-Browser: https://nest.parrot.sh/packages/debian/live-build
-Vcs-Git: https://nest.parrot.sh/packages/debian/live-build.git
+Vcs-Browser: https://nest.parrotsec.org/packages/debian/live-build
+Vcs-Git: https://nest.parrotsec.org/packages/debian/live-build.git
 
 Package: live-build
 Architecture: all
@@ -27,6 +27,8 @@ Recommends:
  live-boot-doc,
  live-config-doc,
  live-manual-html | live-manual,
+ rsync,
+ systemd-container,
  wget,
  xz-utils,
 Suggests:
@@ -34,7 +36,7 @@ Suggests:
  parted,
  mtd-utils,
 Description: Live System Build Components
- The Live Systems project maintains the components to build Debian based Live
+ The Debian Live project maintains the components to build Debian based Live
  systems and the official Debian Live images themselves.
  .
  live-build contains the components to build a live system from a configuration

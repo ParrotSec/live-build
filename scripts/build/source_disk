@@ -1,6 +1,7 @@
 #!/bin/sh
 
 ## live-build(7) - System Build Scripts
+## Copyright (C) 2016-2020 The Debian Live team
 ## Copyright (C) 2006-2015 Daniel Baumann <mail@daniel-baumann.ch>
 ##
 ## This program comes with ABSOLUTELY NO WARRANTY; for details see COPYING.
@@ -14,15 +15,11 @@ set -e
 [ -e "${LIVE_BUILD}/scripts/build.sh" ] && . "${LIVE_BUILD}/scripts/build.sh" || . /usr/lib/live/build.sh
 
 # Setting static variables
-DESCRIPTION="$(Echo 'install disk information into source')"
-HELP=""
+DESCRIPTION="Install disk information into source"
 USAGE="${PROGRAM} [--force]"
 
-Arguments "${@}"
-
-# Reading configuration files
-Read_conffiles config/all config/common config/bootstrap config/chroot config/binary config/source
-Set_defaults
+# Processing arguments and configuration files
+Init_config_data "${@}"
 
 case "${LB_SOURCE_IMAGES}" in
 	iso*|hdd*)
@@ -36,16 +33,13 @@ esac
 Echo_message "Begin installing disk information..."
 
 # Requiring stage file
-Require_stagefile .build/config .build/bootstrap
+Require_stagefiles config bootstrap
 
 # Checking stage file
-Check_stagefile .build/source_disk
+Check_stagefile
 
-# Checking lock file
-Check_lockfile .lock
-
-# Creating lock file
-Create_lockfile .lock
+# Acquire lock file
+Acquire_lockfile
 
 mkdir -p source/.disk
 
@@ -64,12 +58,6 @@ case "${LB_MODE}" in
 		TITLE="Debian GNU/Linux"
 		STRING="Official Snapshot ${ARCHITECTURE}"
 		TRACE="project/trace/ftp-master.debian.org"
-		;;
-
-	progress-linux)
-		TITLE="Progress Linux"
-		STRING="${VERSION} (${DISTRIBUTION}) - ${ARCHITECTURE}"
-		TRACE="project/trace/archive-master.progress-linux.org"
 		;;
 
 	*)
@@ -97,27 +85,33 @@ then
 	esac
 fi
 
+_DATE="$(date $DATE_UTC_OPTION -d@${SOURCE_DATE_EPOCH} +%Y%m%d-%H:%M)"
+
 case "${LB_DEBIAN_INSTALLER}" in
 	cdrom)
-		echo "${TITLE} ${VERSION} \"${DISTRIBUTION}\" - ${STRING} LIVE/CD Source $(date +%Y%m%d-%H:%M)" > source/.disk/info
+		echo "${TITLE} ${VERSION} \"${DISTRIBUTION}\" - ${STRING} LIVE/CD Source ${_DATE}" > source/.disk/info
 		;;
 
-	true|netinst)
-		echo "${TITLE} ${VERSION} \"${DISTRIBUTION}\" - ${STRING} LIVE/NETINST Source $(date +%Y%m%d-%H:%M)" > source/.disk/info
+	netinst)
+		echo "${TITLE} ${VERSION} \"${DISTRIBUTION}\" - ${STRING} LIVE/NETINST Source ${_DATE}" > source/.disk/info
+		;;
+
+	netboot)
+		echo "${TITLE} ${VERSION} \"${DISTRIBUTION}\" - ${STRING} LIVE/NETBOOT Source ${_DATE}" > source/.disk/info
 		;;
 
 	live)
-		echo "${TITLE} ${VERSION} \"${DISTRIBUTION}\" - ${STRING} LIVE/INSTALL Source $(date +%Y%m%d-%H:%M)" > source/.disk/info
+		echo "${TITLE} ${VERSION} \"${DISTRIBUTION}\" - ${STRING} LIVE/INSTALL Source ${_DATE}" > source/.disk/info
 		;;
 
 	businesscard)
-		echo "${TITLE} ${VERSION} \"${DISTRIBUTION}\" - ${STRING} LIVE/BC Source $(date +%Y%m%d-%H:%M)" > source/.disk/info
+		echo "${TITLE} ${VERSION} \"${DISTRIBUTION}\" - ${STRING} LIVE/BC Source ${_DATE}" > source/.disk/info
 		;;
 
-	false)
-		echo "${TITLE} ${VERSION} \"${DISTRIBUTION}\" - ${STRING} LIVE Source $(date +%Y%m%d-%H:%M)" > source/.disk/info
+	none)
+		echo "${TITLE} ${VERSION} \"${DISTRIBUTION}\" - ${STRING} LIVE Source ${_DATE}" > source/.disk/info
 		;;
 esac
 
 # Creating stage file
-Create_stagefile .build/source_disk
+Create_stagefile

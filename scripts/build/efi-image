@@ -1,6 +1,7 @@
 #! /bin/sh
 set -e
 
+# Copyright (C) 2016-2020 The Debian Live team
 # Copyright (C) 2010, 2011 Canonical Ltd.
 # Author: Colin Watson <cjwatson@ubuntu.com>
 #
@@ -52,10 +53,12 @@ search --file --set=root /.disk/info
 set prefix=(\$root)/boot/grub
 source \$prefix/$platform/grub.cfg
 EOF
+# Set the timestamps
+find $workdir -newermt "$(date -d@${SOURCE_DATE_EPOCH} '+%Y-%m-%d %H:%M:%S')" -exec touch '{}' -d@${SOURCE_DATE_EPOCH} ';'
 
 mkdir -p "$outdir/boot/grub/$platform"
 (for i in /usr/lib/grub/$platform/part_*.mod; do
-    i=`echo $i | sed 's?^.*/??g;s?\.mod$??g;'`
+	i=`echo $i | sed 's?^.*/??g;s?\.mod$??g;'`
 	echo "insmod $i"
  done; \
  echo "source /boot/grub/grub.cfg") >"$outdir/boot/grub/$platform/grub.cfg"
@@ -72,15 +75,18 @@ grub-mkimage -O "$platform" \
 
 # Stuff it into a FAT filesystem, making it as small as possible.  24KiB
 # headroom seems to be enough; (x+31)/32*32 rounds up to multiple of 32.
+# The VOLID must be (truncated to) a 32bit hexadecimal number
 mkfs.msdos -C "$outdir/efi.img" \
 	$(( ($(stat -c %s "$workdir/boot$efi_name.efi") / 1024 + 55) \
-	    / 32 * 32 ))
+	    / 32 * 32 )) -i $(printf "%08x" $((${SOURCE_DATE_EPOCH}%4294967296)))
 mmd -i "$outdir/efi.img" ::efi
 mmd -i "$outdir/efi.img" ::efi/boot
-mcopy -i "$outdir/efi.img" "$workdir/boot$efi_name.efi" \
+# Set the timestamp of the .efi file
+touch "$workdir/boot$efi_name.efi" -d@${SOURCE_DATE_EPOCH}
+mcopy -m -i "$outdir/efi.img" "$workdir/boot$efi_name.efi" \
 	"::efi/boot/boot$efi_name.efi"
 
 grub-cpmodules "$outdir" "$platform"
-cp /usr/share/grub/unicode.pf2 "$outdir/boot/grub/"
+cp -a /usr/share/grub/unicode.pf2 "$outdir/boot/grub/"
 
 exit 0

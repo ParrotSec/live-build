@@ -1,6 +1,7 @@
 #!/bin/sh
 
 ## live-build(7) - System Build Scripts
+## Copyright (C) 2016-2020 The Debian Live team
 ## Copyright (C) 2006-2015 Daniel Baumann <mail@daniel-baumann.ch>
 ##
 ## This program comes with ABSOLUTELY NO WARRANTY; for details see COPYING.
@@ -14,61 +15,56 @@ set -e
 [ -e "${LIVE_BUILD}/scripts/build.sh" ] && . "${LIVE_BUILD}/scripts/build.sh" || . /usr/lib/live/build.sh
 
 # Setting static variables
-DESCRIPTION="$(Echo 'build source image')"
-HELP=""
+DESCRIPTION="Build source image"
 USAGE="${PROGRAM} [--force]"
 
-Arguments "${@}"
-
-# Reading configuration files
-Read_conffiles config/all config/common config/bootstrap config/chroot config/binary config/source
-Set_defaults
+# Processing arguments and configuration files
+Init_config_data "${@}"
 
 if [ "${LB_SOURCE}" != "true" ]
 then
 	exit 0
 fi
 
-if ! In_list hdd "${LB_SOURCE_IMAGES}"
-then
+if ! In_list hdd ${LB_SOURCE_IMAGES}; then
 	exit 0
 fi
 
 Echo_message "Begin building source hdd image..."
 
 # Requiring stage file
-Require_stagefile .build/config .build/source_debian
+Require_stagefiles config source_debian
 
 # Checking stage file
-Check_stagefile .build/source_hdd
+Check_stagefile
 
-# Checking lock file
-Check_lockfile .lock
-
-# Creating lock file
-Create_lockfile .lock
+# Acquire lock file
+Acquire_lockfile
 
 # Checking depends
 Check_package chroot /sbin/mkdosfs dosfstools
 Check_package chroot /sbin/parted parted
+Check_package host /sbin/fdisk fdisk
+Check_package host /sbin/losetup mount
 
 # Installing depends
-Install_package
+Install_packages
 
 # Remove old source
-if [ -f ${LIVE_IMAGE_NAME}-source.img ]
+if [ -f ${LB_IMAGE_NAME}-source.img ]
 then
-	rm -f ${LIVE_IMAGE_NAME}-source.img
+	rm -f ${LB_IMAGE_NAME}-source.img
 fi
 
 # Everything which comes here needs to be cleaned up,
 DU_DIM="$(du -ms source | cut -f1)"
 REAL_DIM="$(Calculate_partition_size ${DU_DIM} ${LB_BINARY_FILESYSTEM})"
-dd if=/dev/zero of=${LIVE_IMAGE_NAME}-source.img bs=1024k count=0 seek=${REAL_DIM}
-FREELO="$(${LB_LOSETUP} -f)"
+dd if=/dev/zero of=${LB_IMAGE_NAME}-source.img bs=1024k count=0 seek=${REAL_DIM}
+MAKEDEV=false
+FREELO="$(losetup -f)"
 if [ ! -b chroot/${FREELO} ]
 then
-	MAKEDEV="true"
+	MAKEDEV=true
 
 	mv chroot/dev chroot/dev.tmp
 	find /dev | cpio -dmpu chroot
@@ -94,12 +90,12 @@ case "${LB_BINARY_FILESYSTEM}" in
 esac
 
 Echo_warning "!!! The following error/warning messages can be ignored !!!"
-Losetup $FREELO ${LIVE_IMAGE_NAME}-source.img 0
+Losetup $FREELO ${LB_IMAGE_NAME}-source.img 0
 Chroot chroot "parted -s ${FREELO} mklabel msdos" || true
 Chroot chroot "parted -a optimal -s ${FREELO} mkpart primary ${PARTITION_TYPE} 0.0 100%" || true
 Lodetach ${FREELO}
 
-Losetup $FREELO ${LIVE_IMAGE_NAME}-source.img 1
+Losetup $FREELO ${LB_IMAGE_NAME}-source.img 1
 
 case "${LB_BINARY_FILESYSTEM}" in
 	ext2|ext3|ext4)
@@ -137,19 +133,18 @@ rmdir source.tmp
 Lodetach ${FREELO}
 Echo_warning "!!! The above error/warning messages can be ignored !!!"
 
-FREELO="$(${LB_LOSETUP} -f)"
-Losetup "$FREELO" ${LIVE_IMAGE_NAME}-source.img 0
+FREELO="$(losetup -f)"
+Losetup "$FREELO" ${LB_IMAGE_NAME}-source.img 0
 Chroot chroot "parted -s ${FREELO} set 1 lba off" || true
 Lodetach ${FREELO}
 
-if [ -n "${MAKEDEV}" ]
-then
+if $MAKEDEV; then
 	rm -rf chroot/dev
 	mv chroot/dev.tmp chroot/dev
 fi
 
 # Removing depends
-Remove_package
+Remove_packages
 
 # Creating stage file
-Create_stagefile .build/source_hdd
+Create_stagefile

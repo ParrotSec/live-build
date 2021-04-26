@@ -1,12 +1,28 @@
-image: registry.salsa.debian.org/salsa-ci-team/ci-image-git-buildpackage:latest
+---
+include:
+  - https://salsa.debian.org/salsa-ci-team/pipeline/raw/master/salsa-ci.yml
+  - https://salsa.debian.org/salsa-ci-team/pipeline/raw/master/pipeline-jobs.yml
+
+stages:
+  - provisioning
+  - build
+  - publish
+  - test
+  - deploy
 
 pages:
+  image: registry.salsa.debian.org/salsa-ci-team/ci-image-git-buildpackage:latest
   stage: deploy
+  allow_failure: true
   artifacts:
     paths:
       - public
   only:
     - master
   script:
-    - gitlab-ci-git-buildpackage-all
+    - mkdir ${CI_PROJECT_DIR}/debian/output/aptly; cd ${CI_PROJECT_DIR}/debian/output/aptly
     - gitlab-ci-aptly
+    - cd ${CI_PROJECT_DIR}
+    - mv ${CI_PROJECT_DIR}/debian/output/aptly/public .
+  dependencies:
+    - build

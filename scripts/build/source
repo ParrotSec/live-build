@@ -1,6 +1,7 @@
 #!/bin/sh
 
 ## live-build(7) - System Build Scripts
+## Copyright (C) 2016-2020 The Debian Live team
 ## Copyright (C) 2006-2015 Daniel Baumann <mail@daniel-baumann.ch>
 ##
 ## This program comes with ABSOLUTELY NO WARRANTY; for details see COPYING.
@@ -13,54 +14,42 @@ set -e
 # Including common functions
 [ -e "${LIVE_BUILD}/scripts/build.sh" ] && . "${LIVE_BUILD}/scripts/build.sh" || . /usr/lib/live/build.sh
 
-# Automatically populating config tree
-if [ -x auto/config ] && [ ! -e .build/config ]
-then
-	Echo_message "Automatically populating config tree."
-	lb config
-fi
-
 # Setting static variables
-DESCRIPTION="$(Echo 'build source images')"
-HELP=""
+DESCRIPTION="Build source images"
 USAGE="${PROGRAM} [--force]"
 
-Arguments "${@}"
+# Automatically populating config tree
+Auto_build_config
 
-# Reading configuration files
-Read_conffiles config/all config/common config/bootstrap config/chroot config/binary config/source
-Set_defaults
+# Processing arguments and configuration files
+Init_config_data "${@}"
 
-if [ "${LB_SOURCE}" != "true" ]
-then
+if [ "${LB_SOURCE}" != "true" ]; then
+	Echo_message "Source stage disabled, skipping"
 	exit 0
 fi
 
-#Require_stagefile
+# Setting up cleanup function
+Setup_clean_exit
 
-# Setup cleanup function
-Setup_cleanup
+CHROOT_PREP="hosts resolv hostname archives"
 
-# Enabling network in chroot
-lb chroot_hosts install ${@}
-lb chroot_resolv install ${@}
-lb chroot_hostname install ${@}
-lb chroot_archives source install ${@}
+# Configuring chroot (enabling networking)
+lb chroot_prep install "${CHROOT_PREP}" mode-archives-source "${@}"
 
 # Preparing images
-lb source_live ${@}
-lb source_debian ${@}
-lb source_disk ${@}
-lb source_hooks ${@}
-lb source_checksums ${@}
+lb source_live "${@}"
+lb source_debian "${@}"
+lb source_disk "${@}"
+lb source_hooks "${@}"
+lb source_checksums "${@}"
 
 # Building images
-lb source_iso ${@}
-lb source_tar ${@}
-lb source_hdd ${@}
+lb source_iso "${@}"
+lb source_tar "${@}"
+lb source_hdd "${@}"
 
 # Deconfiguring chroot
-lb chroot_archives chroot remove ${@}
-lb chroot_hostname remove ${@}
-lb chroot_resolv remove ${@}
-lb chroot_hosts remove ${@}
+lb chroot_prep remove "${CHROOT_PREP}" mode-archives-source "${@}"
+
+Echo_message "Source stage completed"

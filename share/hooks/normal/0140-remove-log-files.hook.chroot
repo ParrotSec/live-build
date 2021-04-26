@@ -5,5 +5,5 @@ set -e
 # Truncate log files
 for _FILE in $(find /var/log/ -type f)
 do
-	: > ${_FILE}
+	truncate --no-create --size=0 ${_FILE}
 done
