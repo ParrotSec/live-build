@@ -55,20 +55,15 @@ do
 		\! -path './boot/grub/stage2_eltorito' \
 		\! -path './*SUMS' \
 		\! -path './*sum.txt' \
-	-print0 | sort -z | xargs -0 ${CHECKSUM}sum > ../${CHECKSUMS}
+		\! -path './*sum.README' \
+	-print0 | sort -z | xargs -0 ${CHECKSUM}sum > ${CHECKSUMS}
 
-cat > ${CHECKSUMS} << EOF
-## This file contains the list of ${CHECKSUM} checksums of all files on this
-## medium.
-##
-## You can verify them automatically with the 'verify-checksums' boot parameter,
-## or, manually with: '${CHECKSUM}sum -c ${CHECKSUMS}'.
-##
-##
+cat > ${CHECKSUM}sum.README << EOF
+The file ${CHECKSUMS} contains the ${CHECKSUM} checksums of all files on this medium.
+
+You can verify them automatically with the 'verify-checksums' boot parameter,
+or, manually with: '${CHECKSUM}sum -c ${CHECKSUMS}'.
 EOF
-
-	cat ../${CHECKSUMS} >> ${CHECKSUMS}
-	rm -f ../${CHECKSUMS}
 
 	cd "${OLDPWD}"
 done

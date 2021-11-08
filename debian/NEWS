@@ -1,3 +1,12 @@
+live-build (1:20210329) unstable; urgency=medium
+
+  The 'filesystem.size' file is no longer created and included in the image,
+  as it is often incorrect and variates depending on the build environment,
+  breaking reproducibility. For more information see the following thread:
+  https://lists.debian.org/debian-live/2021/03/msg00008.html
+
+ -- Luca Boccassi <bluca@debian.org>  Mon, 29 Mar 2021 10:49:43 +0100
+
 live-build (1:20180411) unstable; urgency=medium
 
   The live-boot mount points have been moved from /lib/live/mount to

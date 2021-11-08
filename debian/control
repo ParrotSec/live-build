@@ -2,8 +2,9 @@ Source: live-build
 Section: misc
 Priority: optional
 XSBC-Original-Maintainer: Debian Live <debian-live@lists.debian.org>
-Maintainer: Parrot Dev Team <team@parrotsec.org>
-Uploaders: Lorenzo "Palinuro" Faletra <palinuro@parrotsec.org>
+Maintainer: Kali Developers <devel@kali.org>
+Uploaders: Raphaël Hertzog <raphael@offensive-security.com>,
+ Luca Boccassi <bluca@debian.org>,
 Build-Depends:
  debhelper-compat (= 12),
  po4a,
@@ -11,8 +12,8 @@ Build-Depends:
 Standards-Version: 4.5.1
 Rules-Requires-Root: no
 Homepage: https://wiki.debian.org/DebianLive
-Vcs-Browser: https://nest.parrotsec.org/packages/debian/live-build
-Vcs-Git: https://nest.parrotsec.org/packages/debian/live-build.git
+Vcs-Browser: https://gitlab.com/kalilinux/packages/live-build
+Vcs-Git: https://gitlab.com/kalilinux/packages/live-build.git
 
 Package: live-build
 Architecture: all

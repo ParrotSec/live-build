@@ -83,9 +83,13 @@ Create_apt_sources_list ()
 						# do nothing
 						;;
 
-					*)
+					buster|jessie|stretch)
 						echo "deb ${PARENT_MIRROR_SECURITY} ${PARENT_DISTRIBUTION}/updates ${LB_PARENT_ARCHIVE_AREAS}" >> "${PARENT_LIST_FILE}"
 						echo "deb-src ${PARENT_MIRROR_SECURITY} ${PARENT_DISTRIBUTION}/updates ${LB_PARENT_ARCHIVE_AREAS}" >> "${PARENT_LIST_FILE}"
+						;;
+					*)
+						echo "deb ${PARENT_MIRROR_SECURITY} ${PARENT_DISTRIBUTION}-security ${LB_PARENT_ARCHIVE_AREAS}" >> "${PARENT_LIST_FILE}"
+						echo "deb-src ${PARENT_MIRROR_SECURITY} ${PARENT_DISTRIBUTION}-security ${LB_PARENT_ARCHIVE_AREAS}" >> "${PARENT_LIST_FILE}"
 						;;
 				esac
 

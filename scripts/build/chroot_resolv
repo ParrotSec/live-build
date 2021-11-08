@@ -57,7 +57,7 @@ case "${_ACTION}" in
 		if [ -f /etc/resolv.conf ]
 		then
 			# Copy resolv file
-			cp /etc/resolv.conf chroot/etc/resolv.conf
+			cp -a /etc/resolv.conf chroot/etc/resolv.conf
 			chmod 644 chroot/etc/resolv.conf
 			Chroot chroot "chown root:root /etc/resolv.conf"
 		fi
@@ -84,7 +84,7 @@ case "${_ACTION}" in
 		if [ -n "${INCLUDE_DIR}" ] && [ -e config/"${INCLUDE_DIR}"/etc/resolv.conf ]
 		then
 			# Copying local resolv.conf
-			cp config/"${INCLUDE_DIR}"/etc/resolv.conf chroot/etc/resolv.conf
+			cp -a config/"${INCLUDE_DIR}"/etc/resolv.conf chroot/etc/resolv.conf
 			chmod 644 chroot/etc/resolv.conf
 			Chroot chroot "chown root:root /etc/resolv.conf"
 			rm -f chroot/etc/resolv.conf.orig

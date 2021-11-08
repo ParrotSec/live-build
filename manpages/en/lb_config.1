@@ -239,9 +239,9 @@ In addition to its specific options \fBlb config\fR understands all generic live
 .IP "\fB\-\-apt\fR apt|apt-get|aptitude" 4
 defines if apt\-get or aptitude is used to install packages when building the image. The default is apt.
 .IP "\fB\-\-apt\-ftp\-proxy\fR \fIURL\fR" 4
-sets the FTP proxy to be used by apt. By default, this is empty. Note that this variable is only for the proxy that gets used by apt internally within the chroot, it is not used for anything else.
+sets the FTP proxy to be used by apt. By default, this is empty. Note that this variable is only for the proxy that gets used by initial debootstrap, and by apt internally within the chroot. It is not used for anything else.
 .IP "\fB\-\-apt\-http\-proxy\fR \fIURL\fR" 4
-sets the HTTP proxy to be used by apt. By default, this is empty. Note that this variable is only for the proxy that gets used by apt internally within the chroot, it is not used for anything else.
+sets the HTTP proxy to be used by apt. By default, this is empty. Note that this variable is only for the proxy that gets used by initial debootstrap, and by apt internally within the chroot. It is not used for anything else.
 .IP "\fB\-\-apt\-indices\fR true|false" 4
 defines if the resulting images should have apt indices or not and defaults to true.
 .IP "\fB\-\-apt\-options\fR \fIOPTION\fR|""\fIOPTIONS\fR""" 4

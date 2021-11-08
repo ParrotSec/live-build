@@ -86,7 +86,7 @@ then
 
 	Print_breakage
 	Echo_message "Running debootstrap (download-only)..."
-	debootstrap ${DEBOOTSTRAP_OPTIONS} --download-only "${LB_PARENT_DISTRIBUTION_CHROOT}" chroot "${LB_PARENT_MIRROR_BOOTSTRAP}" ${DEBOOTSTRAP_SCRIPT}
+	/usr/bin/env http_proxy="${LB_APT_HTTP_PROXY}" ftp_proxy="${LB_APT_FTP_PROXY}" debootstrap ${DEBOOTSTRAP_OPTIONS} --download-only "${LB_PARENT_DISTRIBUTION_CHROOT}" chroot "${LB_PARENT_MIRROR_BOOTSTRAP}" ${DEBOOTSTRAP_SCRIPT}
 
 	# Removing old cache
 	rm -f cache/packages.bootstrap/*.deb

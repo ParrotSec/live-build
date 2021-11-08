@@ -963,10 +963,10 @@ LB_CONFIGURATION_VERSION="${LB_CONFIGURATION_VERSION}"
 # Set package manager
 LB_APT="${LB_APT}"
 
-# Set apt/aptitude ftp proxy
+# Set apt/aptitude/debootstrap ftp proxy
 LB_APT_FTP_PROXY="${LB_APT_FTP_PROXY}"
 
-# Set apt/aptitude http proxy
+# Set apt/aptitude/debootstrap http proxy
 LB_APT_HTTP_PROXY="${LB_APT_HTTP_PROXY}"
 
 # Set apt/aptitude pipeline depth

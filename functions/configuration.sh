@@ -352,6 +352,19 @@ Prepare_config ()
 		Echo_warning "A value of 'true' for option LB_DEBIAN_INSTALLER is deprecated, please use 'netinst' in future."
 	fi
 
+	# cdrom-checker in d-i requires a md5 checksum file
+	if [ "${LB_DEBIAN_INSTALLER}" != "none" ]
+	then
+		if [ "${LB_CHECKSUMS}" = "none" ]
+		then
+			LB_CHECKSUMS="md5"
+		else
+			if ! In_list md5 ${LB_CHECKSUMS}; then
+				LB_CHECKSUMS=${LB_CHECKSUMS}" md5"
+			fi
+		fi
+	fi
+
 	LB_DEBIAN_INSTALLER_DISTRIBUTION="${LB_DEBIAN_INSTALLER_DISTRIBUTION:-${LB_DISTRIBUTION}}"
 	LB_DEBIAN_INSTALLER_GUI="${LB_DEBIAN_INSTALLER_GUI:-true}"
 
@@ -648,9 +661,14 @@ Validate_config_permitted_values ()
 		fi
 	done
 
-	if ! In_list "${LB_CHECKSUMS}" md5 sha1 sha224 sha256 sha384 sha512 none; then
-		Echo_error "You have specified an invalid value for LB_CHECKSUMS (--checksums)."
-		exit 1
+	local CHECKSUM
+	if [ "${LB_CHECKSUMS}" != "none" ]; then
+		for CHECKSUM in ${LB_CHECKSUMS}; do
+			if ! In_list "${CHECKSUM}" md5 sha1 sha224 sha256 sha384 sha512; then
+				Echo_error "You have specified an invalid value for LB_CHECKSUMS (--checksums): '%s'" "${CHECKSUM}"
+				exit 1
+			fi
+		done
 	fi
 
 	if ! In_list "${LB_CHROOT_FILESYSTEM}" ext2 ext3 ext4 squashfs jffs2 none; then
